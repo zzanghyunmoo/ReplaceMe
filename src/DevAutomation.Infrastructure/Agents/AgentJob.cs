@@ -1,7 +1,9 @@
 using DevAutomation.Core.Abstractions;
 using DevAutomation.Core.Entities;
 using DevAutomation.Core.Services;
+using System.Diagnostics;
 using DevAutomation.Infrastructure.Persistence;
+using DevAutomation.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -37,6 +39,10 @@ public sealed class AgentJob
 
     public async Task RunAsync(Guid ticketId)
     {
+        using var activity = DevAutomationTelemetry.ActivitySource.StartActivity("AgentJob.Run", ActivityKind.Internal);
+        activity?.SetTag("ticket.id", ticketId);
+        var startedAt = Stopwatch.GetTimestamp();
+        DevAutomationTelemetry.AgentJobsStarted.Add(1);
         using var cts = new CancellationTokenSource();
         var cancellationToken = cts.Token;
         var ticket = await _dbContext.Tickets.FirstOrDefaultAsync(x => x.Id == ticketId, cancellationToken)
@@ -56,9 +62,11 @@ public sealed class AgentJob
                 return;
             }
 
+            var count = logBuffer.Count;
             _dbContext.ExecutionLogs.AddRange(logBuffer);
             logBuffer.Clear();
             await _dbContext.SaveChangesAsync(flushCancellationToken);
+            DevAutomationTelemetry.ExecutionLogsFlushed.Add(count);
         }
 
         try
@@ -89,12 +97,15 @@ public sealed class AgentJob
             if (result.Succeeded)
             {
                 _stateMachine.MarkCompleted(ticket, _clock.UtcNow, result.PullRequestUrl);
+                DevAutomationTelemetry.AgentJobsCompleted.Add(1, new KeyValuePair<string, object?>("agent.result", "succeeded"));
             }
             else
             {
                 _stateMachine.MarkFailed(ticket, _clock.UtcNow, result.FailureReason ?? "Agent failed.");
+                DevAutomationTelemetry.AgentJobsFailed.Add(1, new KeyValuePair<string, object?>("agent.result", "failed"));
             }
 
+            activity?.SetTag("ticket.status", ticket.Status.ToString());
             await _dbContext.SaveChangesAsync(cancellationToken);
             if (result.Succeeded)
             {
@@ -115,10 +126,16 @@ public sealed class AgentJob
             if (ticket.Status != TicketStatus.Cancelled)
             {
                 _stateMachine.MarkFailed(ticket, _clock.UtcNow, ex.Message);
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                DevAutomationTelemetry.AgentJobsFailed.Add(1, new KeyValuePair<string, object?>("agent.result", "exception"));
                 await _dbContext.SaveChangesAsync(CancellationToken.None);
                 await _issueTrackerService.NotifyFailedAsync(ticket, ticket.FailReason ?? ex.Message, CancellationToken.None);
                 await _ticketNotifier.NotifyStatusChangedAsync(ticket, CancellationToken.None);
             }
+        }
+        finally
+        {
+            DevAutomationTelemetry.AgentJobDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalSeconds);
         }
     }
 }

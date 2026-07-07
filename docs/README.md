@@ -7,6 +7,8 @@
 <!-- markdownlint-disable MD013 -->
 - [`feature-overview.html`](./feature-overview.html) — 전체 기능을 한 화면에서
   보는 HTML 요약
+- [`pr-2-5-feature-summary.html`](./pr-2-5-feature-summary.html) — 분할 PR #2-#5
+  기능과 배포 순서 요약
 - [`features/ticket-management.md`](./features/ticket-management.md) — 티켓 API와
   상태 전이
 - [`features/agent-execution.md`](./features/agent-execution.md) — Kafka/Docker
