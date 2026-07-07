@@ -5,6 +5,8 @@ using Docker.DotNet.Models;
 using DevAutomation.Core.Abstractions;
 using DevAutomation.Core.Entities;
 using DevAutomation.Core.Options;
+using DevAutomation.Infrastructure.CodingAgents;
+using DevAutomation.Infrastructure.RemoteRepositories;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -15,19 +17,32 @@ public sealed class DockerAgentRunner : IAgentRunner, IDisposable
     private readonly DockerClient _dockerClient;
     private readonly AgentOptions _options;
     private readonly IConfiguration _configuration;
+    private readonly IRemoteRepositoryIntegration _remoteRepository;
+    private readonly ICodingAgentIntegration _codingAgent;
+    private readonly CodingAgentOptions _codingAgentOptions;
     private readonly ILogger<DockerAgentRunner> _logger;
     private readonly ClaudeStreamParser _parser = new();
     private readonly SecretRedactor _redactor;
 
-    public DockerAgentRunner(IOptions<AgentOptions> options, IConfiguration configuration, ILogger<DockerAgentRunner> logger)
+    public DockerAgentRunner(
+        IOptions<AgentOptions> options,
+        IOptions<CodingAgentOptions> codingAgentOptions,
+        IConfiguration configuration,
+        IRemoteRepositoryIntegration remoteRepository,
+        ICodingAgentIntegration codingAgent,
+        ILogger<DockerAgentRunner> logger)
     {
         _options = options.Value;
+        _codingAgentOptions = codingAgentOptions.Value;
         _configuration = configuration;
+        _remoteRepository = remoteRepository;
+        _codingAgent = codingAgent;
         _logger = logger;
         _dockerClient = new DockerClientConfiguration().CreateClient();
         _redactor = new SecretRedactor([
             _options.AnthropicApiKey,
             _options.GitHubToken,
+            _options.GitLabToken,
             _configuration["Slack:BotToken"],
             _configuration["Slack:SigningSecret"]
         ]);
@@ -175,7 +190,8 @@ public sealed class DockerAgentRunner : IAgentRunner, IDisposable
 
         var candidate = line[(markerIndex + marker.Length)..].Trim();
         return Uri.TryCreate(candidate, UriKind.Absolute, out var uri)
-            && uri.AbsolutePath.Contains("/pull/", StringComparison.OrdinalIgnoreCase)
+            && (uri.AbsolutePath.Contains("/pull/", StringComparison.OrdinalIgnoreCase)
+                || uri.AbsolutePath.Contains("/merge_requests/", StringComparison.OrdinalIgnoreCase))
                 ? uri.ToString()
                 : null;
     }
@@ -214,9 +230,10 @@ public sealed class DockerAgentRunner : IAgentRunner, IDisposable
             $"APPROVAL_MCP_COMMAND={_options.ApprovalMcpCommand}"
         };
 
-        if (!string.IsNullOrWhiteSpace(_options.AnthropicApiKey)) env.Add($"ANTHROPIC_API_KEY={_options.AnthropicApiKey}");
-        if (!string.IsNullOrWhiteSpace(_options.GitHubToken)) env.Add($"GITHUB_TOKEN={_options.GitHubToken}");
+        _codingAgent.AddEnvironment(env, _options, _codingAgentOptions);
+        _remoteRepository.AddEnvironment(env, _options);
 
+        env.Add($"REMOTE_REPOSITORY_PROVIDER={_remoteRepository.Provider}");
         AddEnvironmentValue(env, "DEVAUTOMATION_ConnectionStrings__Postgres", _configuration.GetConnectionString("Postgres"));
         AddEnvironmentValue(env, "DEVAUTOMATION_Approval__ApprovalTimeout", _configuration["Approval:ApprovalTimeout"]);
         AddEnvironmentValue(env, "DEVAUTOMATION_Approval__PollInterval", _configuration["Approval:PollInterval"]);
@@ -234,7 +251,11 @@ public sealed class DockerAgentRunner : IAgentRunner, IDisposable
         }
     }
 
-    private static string BuildAgentScript() => """
+    private string BuildAgentScript()
+    {
+        var runAgentScript = _codingAgent.BuildRunScript();
+        var changeRequestScript = _remoteRepository.BuildCreateChangeRequestScript();
+        return $$"""
 set -eu
 workdir=/work
 mkdir -p "$workdir"
@@ -245,6 +266,20 @@ git fetch origin "$BASE_BRANCH"
 git checkout "$BASE_BRANCH"
 branch="agent/ticket-${TICKET_ID}"
 git checkout -b "$branch"
+node <<'NODE' > /tmp/authenticated-remote
+const remote = process.env.REPO_URL || '';
+const provider = process.env.REMOTE_REPOSITORY_PROVIDER || 'GitHub';
+const isGitLab = provider.toLowerCase() === 'gitlab';
+const token = isGitLab ? process.env.GITLAB_TOKEN : process.env.GITHUB_TOKEN;
+if (!token || !/^https?:\/\//i.test(remote)) process.exit(0);
+const url = new URL(remote);
+url.username = isGitLab ? 'oauth2' : 'x-access-token';
+url.password = token;
+process.stdout.write(url.toString());
+NODE
+if [ -s /tmp/authenticated-remote ]; then
+  git remote set-url origin "$(cat /tmp/authenticated-remote)"
+fi
 node <<'NODE' > /tmp/claude-mcp.json
 const command = process.env.APPROVAL_MCP_COMMAND || "dotnet /app/DevAutomation.ApprovalMcp.dll";
 process.stdout.write(JSON.stringify({
@@ -256,16 +291,13 @@ process.stdout.write(JSON.stringify({
   }
 }));
 NODE
-claude -p "$TICKET_PROMPT" --output-format stream-json --mcp-config /tmp/claude-mcp.json --strict-mcp-config --permission-prompt-tool mcp__approval__approval_prompt
+{{runAgentScript}}
 if [ -n "$(git status --porcelain)" ]; then
   git add -A
   git commit -m "feat: automate ${TICKET_TITLE}"
   git push origin "$branch"
-  if command -v gh >/dev/null 2>&1; then
-    pr_url=$(gh pr create --base "$BASE_BRANCH" --head "$branch" --title "$TICKET_TITLE" --body "Automated implementation for ticket ${TICKET_ID}")
-    printf '%s\n' "$pr_url" > /tmp/pr-url
-    printf 'PR_URL=%s\n' "$pr_url"
-  fi
+{{changeRequestScript}}
 fi
 """;
+    }
 }
