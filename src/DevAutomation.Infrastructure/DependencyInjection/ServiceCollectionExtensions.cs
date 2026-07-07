@@ -3,6 +3,7 @@ using DevAutomation.Core.Options;
 using DevAutomation.Core.Services;
 using DevAutomation.Infrastructure.Agents;
 using DevAutomation.Infrastructure.Persistence;
+using DevAutomation.Infrastructure.Queues;
 using DevAutomation.Infrastructure.Slack;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -17,7 +18,7 @@ public static class ServiceCollectionExtensions
         services.Configure<AgentOptions>(configuration.GetSection(AgentOptions.SectionName));
         services.Configure<ApprovalOptions>(configuration.GetSection(ApprovalOptions.SectionName));
         services.Configure<SlackOptions>(configuration.GetSection(SlackOptions.SectionName));
-        services.Configure<RedisOptions>(configuration.GetSection(RedisOptions.SectionName));
+        services.Configure<QueueOptions>(configuration.GetSection(QueueOptions.SectionName));
 
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<TicketStateMachine>();
@@ -38,6 +39,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISlackSignatureVerifier, SlackSignatureVerifier>();
         services.AddHttpClient<IApprovalNotifier, SlackApprovalNotifier>();
         services.AddHttpClient<ITicketNotifier, SlackApprovalNotifier>();
+        services.AddScoped<ITicketQueue, KafkaTicketQueue>();
         return services;
     }
 }

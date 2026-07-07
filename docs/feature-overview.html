@@ -343,7 +343,7 @@
         <div class="eyebrow">✨ ReplaceMe / DevAutomation feature map</div>
         <h1>요구사항 티켓에서 PR까지, 자동 개발 오케스트레이션</h1>
         <p class="lead">
-          ReplaceMe는 개발 요구사항을 티켓으로 받고, Hangfire가 Docker 안의
+          ReplaceMe는 개발 요구사항을 티켓으로 받고, Kafka worker가 Docker 안의
           Claude Code를 실행하며, 민감 작업은 Slack 승인 버튼으로 통제하는 .NET
           8 기반 자동화 서버입니다.
         </p>
@@ -359,7 +359,7 @@
           <strong>8</strong><span>주요 API/운영 엔드포인트</span>
         </div>
         <div class="stat">
-          <strong>3</strong><span>핵심 인프라: API + PostgreSQL + Redis</span>
+          <strong>3</strong><span>핵심 인프라: API + PostgreSQL + Kafka</span>
         </div>
         <div class="stat"><strong>1</strong><span>승인 MCP tool</span></div>
       </section>
@@ -383,11 +383,11 @@
         <article class="card">
           <h3>🤖 에이전트 실행 워커</h3>
           <p>
-            Hangfire job이 Docker 컨테이너를 만들고 Claude Code headless를 격리
+            Kafka worker가 Docker 컨테이너를 만들고 Claude Code headless를 격리
             실행합니다.
           </p>
           <div class="badge-row">
-            <span class="badge">Hangfire</span
+            <span class="badge">Kafka</span
             ><span class="badge">Docker.DotNet</span
             ><span class="badge">PR URL</span>
           </div>
@@ -438,8 +438,8 @@
         <article class="card">
           <h3>🛠️ 로컬 실행/운영</h3>
           <p>
-            Docker Compose, `/health`, Hangfire dashboard, .env 기반 설정으로
-            로컬 검증을 지원합니다.
+            Docker Compose, `/health`, Kafka, .env 기반 설정으로 로컬 검증을
+            지원합니다.
           </p>
           <div class="badge-row">
             <span class="badge">Compose</span><span class="badge">Health</span
@@ -462,7 +462,7 @@
             <b>1. Ticket</b><span>`POST /api/tickets`로 요구사항 저장</span>
           </div>
           <div class="step">
-            <b>2. Queue</b><span>Hangfire `agents` 큐에 job 등록</span>
+            <b>2. Queue</b><span>Kafka topic에 agent job publish</span>
           </div>
           <div class="step">
             <b>3. Agent</b><span>Docker 안에서 `claude -p` 실행</span>
@@ -487,8 +487,8 @@
             <li>
               <code>docker compose --profile build-only build agent-image</code>
             </li>
-            <li><code>docker compose up --build api postgres redis</code></li>
-            <li><code>open http://localhost:8080/hangfire</code></li>
+            <li><code>docker compose up --build api postgres kafka</code></li>
+            <li><code>curl http://localhost:8080/health</code></li>
           </ul>
         </div>
         <div class="callout">
