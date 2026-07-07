@@ -6,3 +6,7 @@ logs/
 *.user
 *.suo
 TestResults/
+
+# AI
+.pi
+.pi-subagents

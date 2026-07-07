@@ -1,20 +1,22 @@
 using System.Text;
+using Confluent.Kafka;
+using DevAutomation.Core.Abstractions;
 using DevAutomation.Core.Contracts;
 using DevAutomation.Core.Entities;
 using DevAutomation.Core.Options;
 using DevAutomation.Core.Services;
-using DevAutomation.Infrastructure.Agents;
 using DevAutomation.Infrastructure.DependencyInjection;
 using DevAutomation.Infrastructure.Persistence;
+using DevAutomation.Infrastructure.Queues;
 using DevAutomation.Infrastructure.Slack;
-using Hangfire;
-using Hangfire.PostgreSql;
-using Hangfire.States;
+using DevAutomation.Infrastructure.Telemetry;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
-using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,22 +33,48 @@ builder.Host.UseSerilog();
 
 builder.Services.AddDevAutomationCore(builder.Configuration);
 builder.Services.AddDevAutomationInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<KafkaAgentWorker>();
 builder.Services.AddEndpointsApiExplorer();
 
-var postgresConnectionString = builder.Configuration.GetConnectionString("Postgres")
-    ?? "Host=postgres;Port=5432;Database=devautomation;Username=devautomation;Password=devautomation";
-
-builder.Services.AddHangfire(configuration => configuration
-    .UseSimpleAssemblyNameTypeSerializer()
-    .UseRecommendedSerializerSettings()
-    .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(postgresConnectionString)));
-
-var agentOptions = builder.Configuration.GetSection(AgentOptions.SectionName).Get<AgentOptions>() ?? new AgentOptions();
-builder.Services.AddHangfireServer(options =>
+var telemetryOptions = builder.Configuration.GetSection(TelemetryOptions.SectionName).Get<TelemetryOptions>() ?? new TelemetryOptions();
+if (telemetryOptions.Enabled)
 {
-    options.WorkerCount = Math.Max(1, agentOptions.MaxConcurrentAgents);
-    options.Queues = ["agents", "default"];
-});
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(resource => resource.AddService(telemetryOptions.ServiceName))
+        .WithTracing(tracing =>
+        {
+            tracing
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddSource(DevAutomationTelemetry.ActivitySourceName);
+
+            if (!string.IsNullOrWhiteSpace(telemetryOptions.OtlpEndpoint))
+            {
+                tracing.AddOtlpExporter(options =>
+                {
+                    options.Endpoint = new Uri(telemetryOptions.OtlpEndpoint);
+                    if (!string.IsNullOrWhiteSpace(telemetryOptions.OtlpHeaders)) options.Headers = telemetryOptions.OtlpHeaders;
+                });
+            }
+        })
+        .WithMetrics(metrics =>
+        {
+            metrics
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddRuntimeInstrumentation()
+                .AddMeter(DevAutomationTelemetry.MeterName);
+
+            if (!string.IsNullOrWhiteSpace(telemetryOptions.OtlpEndpoint))
+            {
+                metrics.AddOtlpExporter(options =>
+                {
+                    options.Endpoint = new Uri(telemetryOptions.OtlpEndpoint);
+                    if (!string.IsNullOrWhiteSpace(telemetryOptions.OtlpHeaders)) options.Headers = telemetryOptions.OtlpHeaders;
+                });
+            }
+        });
+}
 
 var app = builder.Build();
 
@@ -58,11 +86,10 @@ if (app.Configuration.GetValue("Database:ApplyMigrations", true))
 }
 
 app.UseSerilogRequestLogging();
-app.UseHangfireDashboard("/hangfire");
 
 app.MapGet("/health", async (
     DevAutomationDbContext dbContext,
-    IOptions<RedisOptions> redisOptions,
+    IOptions<QueueOptions> queueOptions,
     CancellationToken cancellationToken) =>
 {
     var checks = new Dictionary<string, string>();
@@ -70,13 +97,16 @@ app.MapGet("/health", async (
 
     try
     {
-        await using var redis = await ConnectionMultiplexer.ConnectAsync(redisOptions.Value.ConnectionString);
-        await redis.GetDatabase().PingAsync();
-        checks["redis"] = "ok";
+        using var adminClient = new AdminClientBuilder(new AdminClientConfig
+        {
+            BootstrapServers = queueOptions.Value.KafkaBootstrapServers
+        }).Build();
+        var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(3));
+        checks["kafka"] = metadata.Brokers.Count > 0 ? "ok" : "failed: no brokers discovered";
     }
     catch (Exception ex)
     {
-        checks["redis"] = $"failed: {ex.Message}";
+        checks["kafka"] = $"failed: {ex.Message}";
     }
 
     try
@@ -96,15 +126,49 @@ app.MapGet("/health", async (
 app.MapPost("/api/tickets", async (
     CreateTicketRequest request,
     DevAutomationDbContext dbContext,
-    IBackgroundJobClient jobs,
-    DevAutomation.Core.Abstractions.IClock clock,
+    ITicketQueue ticketQueue,
+    IIssueTrackerService issueTrackerService,
+    IOptions<IssueTrackerOptions> issueTrackerOptions,
+    IClock clock,
     CancellationToken cancellationToken) =>
 {
     var ticket = Ticket.Create(request.Title, request.Description, request.RepoUrl, request.BaseBranch, clock.UtcNow);
+    var issueProvider = issueTrackerOptions.Value.Provider;
+    var hasExternalIssueReference = !string.IsNullOrWhiteSpace(request.ExternalIssueId)
+        || !string.IsNullOrWhiteSpace(request.ExternalIssueKey)
+        || !string.IsNullOrWhiteSpace(request.ExternalIssueUrl);
+
+    if ((request.CreateExternalIssue || hasExternalIssueReference) && issueProvider == IssueTrackerProvider.None)
+    {
+        return Results.BadRequest("IssueTracker:Provider must be Jira or Linear when creating or linking an external issue.");
+    }
+
+    if (hasExternalIssueReference)
+    {
+        ticket.AttachIssueTracker(issueProvider, request.ExternalIssueId, request.ExternalIssueKey, request.ExternalIssueUrl);
+    }
+
     await dbContext.Tickets.AddAsync(ticket, cancellationToken);
     await dbContext.SaveChangesAsync(cancellationToken);
 
-    jobs.Create<AgentJob>(job => job.RunAsync(ticket.Id), new EnqueuedState("agents"));
+    if (request.CreateExternalIssue)
+    {
+        try
+        {
+            var issue = await issueTrackerService.CreateIssueAsync(ticket, cancellationToken);
+            ticket.AttachIssueTracker(issueProvider, issue.Id, issue.Key, issue.Url);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            ticket.MarkFailed(clock.UtcNow, $"External issue creation failed: {ex.Message}");
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return Results.Problem(title: "External issue creation failed", detail: ex.Message, statusCode: StatusCodes.Status502BadGateway);
+        }
+    }
+
+    DevAutomationTelemetry.TicketsCreated.Add(1, new KeyValuePair<string, object?>("issue.provider", issueProvider.ToString()), new KeyValuePair<string, object?>("queue.provider", "Kafka"));
+    await ticketQueue.EnqueueAgentJobAsync(ticket.Id, cancellationToken);
     return Results.Created($"/api/tickets/{ticket.Id}", TicketResponse.From(ticket));
 });
 
@@ -112,6 +176,26 @@ app.MapGet("/api/tickets/{id:guid}", async (Guid id, DevAutomationDbContext dbCo
 {
     var ticket = await dbContext.Tickets.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     return ticket is null ? Results.NotFound() : Results.Ok(TicketResponse.From(ticket));
+});
+
+app.MapPost("/api/tickets/{id:guid}/documents", async (
+    Guid id,
+    DevAutomationDbContext dbContext,
+    IDocumentToolService documentToolService,
+    CancellationToken cancellationToken) =>
+{
+    var ticket = await dbContext.Tickets.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    if (ticket is null) return Results.NotFound();
+
+    try
+    {
+        var document = await documentToolService.CreateTicketDocumentAsync(ticket, cancellationToken);
+        return Results.Ok(document);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
 });
 
 app.MapGet("/api/tickets", async (
@@ -189,6 +273,41 @@ app.MapGet("/api/approvals", async (
     var skip = Math.Max(0, (page ?? 1) - 1) * take;
     var items = await query.OrderByDescending(x => x.RequestedAt).Skip(skip).Take(take).Select(x => ApprovalRequestResponse.From(x)).ToListAsync(cancellationToken);
     return Results.Ok(items);
+});
+
+app.MapPost("/api/approvals/{id:guid}/approve", async (
+    Guid id,
+    DevAutomationDbContext dbContext,
+    IApprovalNotifier notifier,
+    IClock clock,
+    CancellationToken cancellationToken) =>
+{
+    var approval = await dbContext.ApprovalRequests.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    if (approval is null) return Results.NotFound();
+    if (approval.Status != ApprovalStatus.Pending) return Results.Conflict(ApprovalRequestResponse.From(approval));
+
+    approval.Approve("api", clock.UtcNow);
+    await dbContext.SaveChangesAsync(cancellationToken);
+    await notifier.UpdateApprovalResultAsync(approval, cancellationToken);
+    return Results.Ok(ApprovalRequestResponse.From(approval));
+});
+
+app.MapPost("/api/approvals/{id:guid}/reject", async (
+    Guid id,
+    RejectApprovalRequest request,
+    DevAutomationDbContext dbContext,
+    IApprovalNotifier notifier,
+    IClock clock,
+    CancellationToken cancellationToken) =>
+{
+    var approval = await dbContext.ApprovalRequests.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    if (approval is null) return Results.NotFound();
+    if (approval.Status != ApprovalStatus.Pending) return Results.Conflict(ApprovalRequestResponse.From(approval));
+
+    approval.Reject("api", clock.UtcNow, string.IsNullOrWhiteSpace(request.Reason) ? "Rejected via API." : request.Reason.Trim());
+    await dbContext.SaveChangesAsync(cancellationToken);
+    await notifier.UpdateApprovalResultAsync(approval, cancellationToken);
+    return Results.Ok(ApprovalRequestResponse.From(approval));
 });
 
 app.MapPost("/api/slack/interactivity", async (

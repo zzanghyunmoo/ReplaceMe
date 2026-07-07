@@ -7,8 +7,7 @@ public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<Dev
 {
     public DevAutomationDbContext CreateDbContext(string[] args)
     {
-        var connectionString = Environment.GetEnvironmentVariable("DEVAUTOMATION_ConnectionStrings__Postgres")
-            ?? "Host=localhost;Port=5432;Database=devautomation;Username=devautomation;Password=devautomation";
+        var connectionString = DatabaseConfiguration.GetPostgresConnectionStringFromEnvironment();
         var builder = new DbContextOptionsBuilder<DevAutomationDbContext>();
         builder.UseNpgsql(connectionString);
         return new DevAutomationDbContext(builder.Options);

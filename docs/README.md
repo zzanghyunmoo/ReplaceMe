@@ -9,8 +9,8 @@
   보는 HTML 요약
 - [`features/ticket-management.md`](./features/ticket-management.md) — 티켓 API와
   상태 전이
-- [`features/agent-execution.md`](./features/agent-execution.md) — Hangfire/Docker
-  기반 Claude Code 실행
+- [`features/agent-execution.md`](./features/agent-execution.md) — Kafka/Docker
+  기반 코딩 에이전트 실행
 - [`features/approval-flow.md`](./features/approval-flow.md) — MCP
   `approval_prompt` 승인 플로우
 - [`features/slack-integration.md`](./features/slack-integration.md) — Slack 알림,
@@ -23,8 +23,8 @@
 
 ## 현재 구현 범위
 
-ReplaceMe는 지금 “요구사항 티켓 → 백그라운드 잡 → 격리 컨테이너에서
-Claude Code 실행 → 필요 시 Slack 승인 → 로그/상태 저장”의 핵심 수직 흐름을
-갖춘 상태입니다.
+ReplaceMe는 지금 “요구사항 티켓 → Kafka 큐 → 격리 컨테이너에서 코딩 에이전트
+실행 → 필요 시 notifier 승인 → 로그/상태 저장”의 핵심 수직 흐름을 갖춘
+상태입니다.
 
 아직 웹 UI, API 인증, 재시도 정책, 운영 배포 설정은 v1 범위 밖입니다.

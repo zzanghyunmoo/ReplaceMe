@@ -2,7 +2,15 @@ using DevAutomation.Core.Entities;
 
 namespace DevAutomation.Core.Contracts;
 
-public sealed record CreateTicketRequest(string Title, string Description, string RepoUrl, string? BaseBranch);
+public sealed record CreateTicketRequest(
+    string Title,
+    string Description,
+    string RepoUrl,
+    string? BaseBranch,
+    bool CreateExternalIssue = false,
+    string? ExternalIssueId = null,
+    string? ExternalIssueKey = null,
+    string? ExternalIssueUrl = null);
 
 public sealed record TicketResponse(
     Guid Id,
@@ -15,7 +23,11 @@ public sealed record TicketResponse(
     DateTimeOffset? StartedAt,
     DateTimeOffset? CompletedAt,
     string? PrUrl,
-    string? FailReason)
+    string? FailReason,
+    IssueTrackerProvider? IssueTracker,
+    string? ExternalIssueId,
+    string? ExternalIssueKey,
+    string? ExternalIssueUrl)
 {
     public static TicketResponse From(Ticket ticket) => new(
         ticket.Id,
@@ -28,13 +40,19 @@ public sealed record TicketResponse(
         ticket.StartedAt,
         ticket.CompletedAt,
         ticket.PrUrl,
-        ticket.FailReason);
+        ticket.FailReason,
+        ticket.IssueTracker,
+        ticket.ExternalIssueId,
+        ticket.ExternalIssueKey,
+        ticket.ExternalIssueUrl);
 }
 
 public sealed record ExecutionLogResponse(Guid Id, Guid TicketId, DateTimeOffset Timestamp, string EventType, string Content)
 {
     public static ExecutionLogResponse From(ExecutionLog log) => new(log.Id, log.TicketId, log.Timestamp, log.EventType, log.Content);
 }
+
+public sealed record RejectApprovalRequest(string? Reason = null);
 
 public sealed record ApprovalRequestResponse(
     Guid Id,
@@ -45,7 +63,8 @@ public sealed record ApprovalRequestResponse(
     DateTimeOffset RequestedAt,
     DateTimeOffset? RespondedAt,
     string? ResponderSlackId,
-    string? SlackMessageTs)
+    string? SlackMessageTs,
+    string? ResponseReason)
 {
     public static ApprovalRequestResponse From(ApprovalRequest request) => new(
         request.Id,
@@ -56,5 +75,6 @@ public sealed record ApprovalRequestResponse(
         request.RequestedAt,
         request.RespondedAt,
         request.ResponderSlackId,
-        request.SlackMessageTs);
+        request.SlackMessageTs,
+        request.ResponseReason);
 }
