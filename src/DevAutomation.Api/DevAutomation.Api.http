@@ -1,0 +1,18 @@
+@DevAutomation.Api_HostAddress = http://localhost:8080
+
+GET {{DevAutomation.Api_HostAddress}}/health
+Accept: application/json
+
+###
+
+POST {{DevAutomation.Api_HostAddress}}/api/tickets
+Content-Type: application/json
+
+{
+  "title": "Example automation ticket",
+  "description": "Implement the requested change and open a PR.",
+  "repoUrl": "https://github.com/example/repo.git",
+  "baseBranch": "main"
+}
+
+###

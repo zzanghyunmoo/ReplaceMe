@@ -1,0 +1,67 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: devautomation-api:local
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DEVAUTOMATION_ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=devautomation;Username=devautomation;Password=devautomation
+      DEVAUTOMATION_Redis__ConnectionString: redis:6379
+      DEVAUTOMATION_Agent__ClaudeImage: devautomation-claude:latest
+      DEVAUTOMATION_Agent__DockerNetwork: devautomation-network
+      DEVAUTOMATION_Agent__ApprovalMcpCommand: dotnet /app/DevAutomation.ApprovalMcp.dll
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - devautomation
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: devautomation
+      POSTGRES_USER: devautomation
+      POSTGRES_PASSWORD: devautomation
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devautomation -d devautomation"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - devautomation
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - devautomation
+
+  agent-image:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    image: devautomation-claude:latest
+    profiles: ["build-only"]
+    command: "echo agent image built"
+
+volumes:
+  postgres-data:
+
+networks:
+  devautomation:
+    name: devautomation-network
