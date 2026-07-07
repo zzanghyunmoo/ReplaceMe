@@ -12,6 +12,7 @@ public sealed class AgentJob
     private readonly DevAutomationDbContext _dbContext;
     private readonly IAgentRunner _agentRunner;
     private readonly ITicketNotifier _ticketNotifier;
+    private readonly IIssueTrackerService _issueTrackerService;
     private readonly IClock _clock;
     private readonly TicketStateMachine _stateMachine;
     private readonly ILogger<AgentJob> _logger;
@@ -20,6 +21,7 @@ public sealed class AgentJob
         DevAutomationDbContext dbContext,
         IAgentRunner agentRunner,
         ITicketNotifier ticketNotifier,
+        IIssueTrackerService issueTrackerService,
         IClock clock,
         TicketStateMachine stateMachine,
         ILogger<AgentJob> logger)
@@ -27,6 +29,7 @@ public sealed class AgentJob
         _dbContext = dbContext;
         _agentRunner = agentRunner;
         _ticketNotifier = ticketNotifier;
+        _issueTrackerService = issueTrackerService;
         _clock = clock;
         _stateMachine = stateMachine;
         _logger = logger;
@@ -93,6 +96,15 @@ public sealed class AgentJob
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
+            if (result.Succeeded)
+            {
+                await _issueTrackerService.NotifyCompletedAsync(ticket, result.PullRequestUrl, cancellationToken);
+            }
+            else
+            {
+                await _issueTrackerService.NotifyFailedAsync(ticket, ticket.FailReason ?? "Agent failed.", cancellationToken);
+            }
+
             await _ticketNotifier.NotifyStatusChangedAsync(ticket, cancellationToken);
         }
         catch (Exception ex)
@@ -104,6 +116,7 @@ public sealed class AgentJob
             {
                 _stateMachine.MarkFailed(ticket, _clock.UtcNow, ex.Message);
                 await _dbContext.SaveChangesAsync(CancellationToken.None);
+                await _issueTrackerService.NotifyFailedAsync(ticket, ticket.FailReason ?? ex.Message, CancellationToken.None);
                 await _ticketNotifier.NotifyStatusChangedAsync(ticket, CancellationToken.None);
             }
         }

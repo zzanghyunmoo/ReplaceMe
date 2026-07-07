@@ -44,7 +44,9 @@ public sealed class DockerAgentRunner : IAgentRunner, IDisposable
             _options.GitHubToken,
             _options.GitLabToken,
             _configuration["Slack:BotToken"],
-            _configuration["Slack:SigningSecret"]
+            _configuration["Slack:SigningSecret"],
+            _configuration["Jira:ApiToken"],
+            _configuration["Linear:ApiKey"]
         ]);
     }
 

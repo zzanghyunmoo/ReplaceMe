@@ -83,12 +83,45 @@ app.MapPost("/api/tickets", async (
     CreateTicketRequest request,
     DevAutomationDbContext dbContext,
     ITicketQueue ticketQueue,
+    IIssueTrackerService issueTrackerService,
+    IOptions<IssueTrackerOptions> issueTrackerOptions,
     IClock clock,
     CancellationToken cancellationToken) =>
 {
     var ticket = Ticket.Create(request.Title, request.Description, request.RepoUrl, request.BaseBranch, clock.UtcNow);
+    var issueProvider = issueTrackerOptions.Value.Provider;
+    var hasExternalIssueReference = !string.IsNullOrWhiteSpace(request.ExternalIssueId)
+        || !string.IsNullOrWhiteSpace(request.ExternalIssueKey)
+        || !string.IsNullOrWhiteSpace(request.ExternalIssueUrl);
+
+    if ((request.CreateExternalIssue || hasExternalIssueReference) && issueProvider == IssueTrackerProvider.None)
+    {
+        return Results.BadRequest("IssueTracker:Provider must be Jira or Linear when creating or linking an external issue.");
+    }
+
+    if (hasExternalIssueReference)
+    {
+        ticket.AttachIssueTracker(issueProvider, request.ExternalIssueId, request.ExternalIssueKey, request.ExternalIssueUrl);
+    }
+
     await dbContext.Tickets.AddAsync(ticket, cancellationToken);
     await dbContext.SaveChangesAsync(cancellationToken);
+
+    if (request.CreateExternalIssue)
+    {
+        try
+        {
+            var issue = await issueTrackerService.CreateIssueAsync(ticket, cancellationToken);
+            ticket.AttachIssueTracker(issueProvider, issue.Id, issue.Key, issue.Url);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            ticket.MarkFailed(clock.UtcNow, $"External issue creation failed: {ex.Message}");
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return Results.Problem(title: "External issue creation failed", detail: ex.Message, statusCode: StatusCodes.Status502BadGateway);
+        }
+    }
 
     await ticketQueue.EnqueueAgentJobAsync(ticket.Id, cancellationToken);
     return Results.Created($"/api/tickets/{ticket.Id}", TicketResponse.From(ticket));
@@ -98,6 +131,26 @@ app.MapGet("/api/tickets/{id:guid}", async (Guid id, DevAutomationDbContext dbCo
 {
     var ticket = await dbContext.Tickets.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     return ticket is null ? Results.NotFound() : Results.Ok(TicketResponse.From(ticket));
+});
+
+app.MapPost("/api/tickets/{id:guid}/documents", async (
+    Guid id,
+    DevAutomationDbContext dbContext,
+    IDocumentToolService documentToolService,
+    CancellationToken cancellationToken) =>
+{
+    var ticket = await dbContext.Tickets.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    if (ticket is null) return Results.NotFound();
+
+    try
+    {
+        var document = await documentToolService.CreateTicketDocumentAsync(ticket, cancellationToken);
+        return Results.Ok(document);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
 });
 
 app.MapGet("/api/tickets", async (

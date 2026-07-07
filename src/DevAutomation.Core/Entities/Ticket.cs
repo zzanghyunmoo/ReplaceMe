@@ -30,6 +30,10 @@ public sealed class Ticket
     public string? PrUrl { get; private set; }
     public string? FailReason { get; private set; }
     public string? ContainerId { get; private set; }
+    public IssueTrackerProvider? IssueTracker { get; private set; }
+    public string? ExternalIssueId { get; private set; }
+    public string? ExternalIssueKey { get; private set; }
+    public string? ExternalIssueUrl { get; private set; }
 
     public IReadOnlyCollection<ApprovalRequest> ApprovalRequests => _approvalRequests;
     public IReadOnlyCollection<ExecutionLog> ExecutionLogs => _executionLogs;
@@ -97,6 +101,20 @@ public sealed class Ticket
     }
 
     public void ClearContainer() => ContainerId = null;
+
+    public void AttachIssueTracker(IssueTrackerProvider provider, string? externalIssueId, string? externalIssueKey, string? externalIssueUrl)
+    {
+        if (provider == IssueTrackerProvider.None) throw new ArgumentException("Issue tracker provider is required.", nameof(provider));
+
+        IssueTracker = provider;
+        ExternalIssueId = NormalizeOptional(externalIssueId);
+        ExternalIssueKey = NormalizeOptional(externalIssueKey);
+        ExternalIssueUrl = NormalizeOptional(externalIssueUrl);
+    }
+
+    public bool HasIssueTrackerReference => IssueTracker is not null and not IssueTrackerProvider.None;
+
+    private static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private void EnsureStatus(params TicketStatus[] allowed)
     {

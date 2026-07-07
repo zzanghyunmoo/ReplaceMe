@@ -1,8 +1,11 @@
 using DevAutomation.Core.Abstractions;
+using DevAutomation.Core.Entities;
 using DevAutomation.Core.Options;
 using DevAutomation.Core.Services;
 using DevAutomation.Infrastructure.Agents;
 using DevAutomation.Infrastructure.CodingAgents;
+using DevAutomation.Infrastructure.DocumentTools;
+using DevAutomation.Infrastructure.IssueTrackers;
 using DevAutomation.Infrastructure.Notifications;
 using DevAutomation.Infrastructure.Persistence;
 using DevAutomation.Infrastructure.Queues;
@@ -25,6 +28,12 @@ public static class ServiceCollectionExtensions
         services.Configure<NotifierOptions>(configuration.GetSection(NotifierOptions.SectionName));
         services.Configure<GmailOptions>(configuration.GetSection(GmailOptions.SectionName));
         services.Configure<CodingAgentOptions>(configuration.GetSection(CodingAgentOptions.SectionName));
+        services.Configure<IssueTrackerOptions>(configuration.GetSection(IssueTrackerOptions.SectionName));
+        services.Configure<JiraOptions>(configuration.GetSection(JiraOptions.SectionName));
+        services.Configure<LinearOptions>(configuration.GetSection(LinearOptions.SectionName));
+        services.Configure<DocumentToolOptions>(configuration.GetSection(DocumentToolOptions.SectionName));
+        services.Configure<NotionOptions>(configuration.GetSection(NotionOptions.SectionName));
+        services.Configure<ConfluenceOptions>(configuration.GetSection(ConfluenceOptions.SectionName));
 
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<TicketStateMachine>();
@@ -44,6 +53,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<SlackInteractivityService>();
         services.AddSingleton<ISlackSignatureVerifier, SlackSignatureVerifier>();
         services.AddScoped<ITicketQueue, KafkaTicketQueue>();
+        services.AddScoped<IIssueTrackerService, IssueTrackerService>();
+        services.AddScoped<IDocumentToolService, DocumentToolService>();
 
         var notifierOptions = configuration.GetSection(NotifierOptions.SectionName).Get<NotifierOptions>() ?? new NotifierOptions();
         switch (notifierOptions.Provider)
@@ -62,6 +73,28 @@ public static class ServiceCollectionExtensions
                 services.AddHttpClient<SlackApprovalNotifier>();
                 services.AddScoped<ITicketNotifier>(sp => sp.GetRequiredService<SlackApprovalNotifier>());
                 services.AddScoped<IApprovalNotifier>(sp => sp.GetRequiredService<SlackApprovalNotifier>());
+                break;
+        }
+
+        var issueTrackerOptions = configuration.GetSection(IssueTrackerOptions.SectionName).Get<IssueTrackerOptions>() ?? new IssueTrackerOptions();
+        switch (issueTrackerOptions.Provider)
+        {
+            case IssueTrackerProvider.Jira:
+                services.AddHttpClient<IIssueTrackerClient, JiraIssueTrackerClient>();
+                break;
+            case IssueTrackerProvider.Linear:
+                services.AddHttpClient<IIssueTrackerClient, LinearIssueTrackerClient>();
+                break;
+        }
+
+        var documentToolOptions = configuration.GetSection(DocumentToolOptions.SectionName).Get<DocumentToolOptions>() ?? new DocumentToolOptions();
+        switch (documentToolOptions.Provider)
+        {
+            case DocumentToolProvider.Notion:
+                services.AddHttpClient<IDocumentToolClient, NotionDocumentToolClient>();
+                break;
+            case DocumentToolProvider.Confluence:
+                services.AddHttpClient<IDocumentToolClient, ConfluenceDocumentToolClient>();
                 break;
         }
 
