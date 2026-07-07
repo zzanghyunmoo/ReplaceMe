@@ -25,6 +25,10 @@ public sealed class DevAutomationDbContext : DbContext
             entity.Property(x => x.PrUrl).HasMaxLength(2048);
             entity.Property(x => x.FailReason).HasMaxLength(4000);
             entity.Property(x => x.ContainerId).HasMaxLength(128);
+            entity.Property(x => x.IssueTracker).HasConversion<string>().HasMaxLength(40);
+            entity.Property(x => x.ExternalIssueId).HasMaxLength(200);
+            entity.Property(x => x.ExternalIssueKey).HasMaxLength(200);
+            entity.Property(x => x.ExternalIssueUrl).HasMaxLength(2048);
             entity.HasIndex(x => x.Status);
             entity.Navigation(x => x.ApprovalRequests).UsePropertyAccessMode(PropertyAccessMode.Field);
             entity.Navigation(x => x.ExecutionLogs).UsePropertyAccessMode(PropertyAccessMode.Field);

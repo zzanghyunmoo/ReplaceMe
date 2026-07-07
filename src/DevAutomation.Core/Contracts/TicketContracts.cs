@@ -6,7 +6,11 @@ public sealed record CreateTicketRequest(
     string Title,
     string Description,
     string RepoUrl,
-    string? BaseBranch);
+    string? BaseBranch,
+    bool CreateExternalIssue = false,
+    string? ExternalIssueId = null,
+    string? ExternalIssueKey = null,
+    string? ExternalIssueUrl = null);
 
 public sealed record TicketResponse(
     Guid Id,
@@ -19,7 +23,11 @@ public sealed record TicketResponse(
     DateTimeOffset? StartedAt,
     DateTimeOffset? CompletedAt,
     string? PrUrl,
-    string? FailReason)
+    string? FailReason,
+    IssueTrackerProvider? IssueTracker,
+    string? ExternalIssueId,
+    string? ExternalIssueKey,
+    string? ExternalIssueUrl)
 {
     public static TicketResponse From(Ticket ticket) => new(
         ticket.Id,
@@ -32,7 +40,11 @@ public sealed record TicketResponse(
         ticket.StartedAt,
         ticket.CompletedAt,
         ticket.PrUrl,
-        ticket.FailReason);
+        ticket.FailReason,
+        ticket.IssueTracker,
+        ticket.ExternalIssueId,
+        ticket.ExternalIssueKey,
+        ticket.ExternalIssueUrl);
 }
 
 public sealed record ExecutionLogResponse(Guid Id, Guid TicketId, DateTimeOffset Timestamp, string EventType, string Content)
