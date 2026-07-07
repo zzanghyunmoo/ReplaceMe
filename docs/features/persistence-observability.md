@@ -4,7 +4,8 @@
 
 ReplaceMe는 PostgreSQL에 티켓, 승인 요청, 실행 로그를 저장합니다. API와
 Kafka worker는 같은 `DevAutomationDbContext`를 사용하고, Serilog는 콘솔과 파일에
-구조화 로그를 남깁니다.
+구조화 로그를 남깁니다. 선택적으로 OpenTelemetry trace/metric을 OTLP endpoint로
+export할 수 있습니다.
 
 ## 데이터 모델
 
@@ -117,7 +118,7 @@ flowchart LR
 - redaction 대상: Anthropic, GitHub, GitLab, Slack, Jira, Linear secret
 - buffer size: 25개 단위 저장
 
-## Serilog
+## Serilog와 OpenTelemetry
 
 API는 Serilog를 사용해 다음 sink로 기록합니다.
 
@@ -127,12 +128,16 @@ API는 Serilog를 사용해 다음 sink로 기록합니다.
 Docker Compose에서는 `./logs:/app/logs` volume을 연결해 컨테이너 밖에서도 로그를
 확인할 수 있습니다.
 
+`Telemetry:Enabled=true`이면 ASP.NET Core, HttpClient, runtime metric과
+`DevAutomationTelemetry` activity/meter를 OTLP exporter로 전송합니다.
+
 ## 코드 위치
 
 - EF Core DbContext: `src/DevAutomation.Infrastructure/Persistence/DevAutomationDbContext.cs`
 - Design-time factory: `src/DevAutomation.Infrastructure/Persistence/DesignTimeDbContextFactory.cs`
 - Approval repository: `src/DevAutomation.Infrastructure/Persistence/EfApprovalRequestRepository.cs`
 - Migrations: `src/DevAutomation.Infrastructure/Migrations/`
+- Telemetry: `src/DevAutomation.Infrastructure/Telemetry/DevAutomationTelemetry.cs`
 - Log parser/redactor: `src/DevAutomation.Infrastructure/Agents/ClaudeStreamParser.cs`,
   `src/DevAutomation.Infrastructure/Agents/SecretRedactor.cs`
 
@@ -155,4 +160,4 @@ ls logs/
 
 - structured log에 ticket id correlation enrichment를 더 강화할 여지가 있습니다.
 - execution log retention/cleanup 정책은 아직 없습니다.
-- OpenTelemetry trace/exporter는 아직 없습니다.
+- OTLP collector는 compose에 포함되어 있지 않습니다.

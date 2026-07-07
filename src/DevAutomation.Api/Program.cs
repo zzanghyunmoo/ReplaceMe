@@ -9,9 +9,13 @@ using DevAutomation.Infrastructure.DependencyInjection;
 using DevAutomation.Infrastructure.Persistence;
 using DevAutomation.Infrastructure.Queues;
 using DevAutomation.Infrastructure.Slack;
+using DevAutomation.Infrastructure.Telemetry;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -31,6 +35,46 @@ builder.Services.AddDevAutomationCore(builder.Configuration);
 builder.Services.AddDevAutomationInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<KafkaAgentWorker>();
 builder.Services.AddEndpointsApiExplorer();
+
+var telemetryOptions = builder.Configuration.GetSection(TelemetryOptions.SectionName).Get<TelemetryOptions>() ?? new TelemetryOptions();
+if (telemetryOptions.Enabled)
+{
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(resource => resource.AddService(telemetryOptions.ServiceName))
+        .WithTracing(tracing =>
+        {
+            tracing
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddSource(DevAutomationTelemetry.ActivitySourceName);
+
+            if (!string.IsNullOrWhiteSpace(telemetryOptions.OtlpEndpoint))
+            {
+                tracing.AddOtlpExporter(options =>
+                {
+                    options.Endpoint = new Uri(telemetryOptions.OtlpEndpoint);
+                    if (!string.IsNullOrWhiteSpace(telemetryOptions.OtlpHeaders)) options.Headers = telemetryOptions.OtlpHeaders;
+                });
+            }
+        })
+        .WithMetrics(metrics =>
+        {
+            metrics
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddRuntimeInstrumentation()
+                .AddMeter(DevAutomationTelemetry.MeterName);
+
+            if (!string.IsNullOrWhiteSpace(telemetryOptions.OtlpEndpoint))
+            {
+                metrics.AddOtlpExporter(options =>
+                {
+                    options.Endpoint = new Uri(telemetryOptions.OtlpEndpoint);
+                    if (!string.IsNullOrWhiteSpace(telemetryOptions.OtlpHeaders)) options.Headers = telemetryOptions.OtlpHeaders;
+                });
+            }
+        });
+}
 
 var app = builder.Build();
 
@@ -123,6 +167,7 @@ app.MapPost("/api/tickets", async (
         }
     }
 
+    DevAutomationTelemetry.TicketsCreated.Add(1, new KeyValuePair<string, object?>("issue.provider", issueProvider.ToString()), new KeyValuePair<string, object?>("queue.provider", "Kafka"));
     await ticketQueue.EnqueueAgentJobAsync(ticket.Id, cancellationToken);
     return Results.Created($"/api/tickets/{ticket.Id}", TicketResponse.From(ticket));
 });
@@ -175,9 +220,9 @@ app.MapGet("/api/tickets", async (
 app.MapPost("/api/tickets/{id:guid}/cancel", async (
     Guid id,
     DevAutomationDbContext dbContext,
-    IAgentRunner agentRunner,
+    DevAutomation.Core.Abstractions.IAgentRunner agentRunner,
     TicketStateMachine stateMachine,
-    IClock clock,
+    DevAutomation.Core.Abstractions.IClock clock,
     CancellationToken cancellationToken) =>
 {
     var ticket = await dbContext.Tickets.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
