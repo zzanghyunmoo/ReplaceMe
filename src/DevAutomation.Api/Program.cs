@@ -1,20 +1,18 @@
 using System.Text;
+using Confluent.Kafka;
+using DevAutomation.Core.Abstractions;
 using DevAutomation.Core.Contracts;
 using DevAutomation.Core.Entities;
 using DevAutomation.Core.Options;
 using DevAutomation.Core.Services;
-using DevAutomation.Infrastructure.Agents;
 using DevAutomation.Infrastructure.DependencyInjection;
 using DevAutomation.Infrastructure.Persistence;
+using DevAutomation.Infrastructure.Queues;
 using DevAutomation.Infrastructure.Slack;
-using Hangfire;
-using Hangfire.PostgreSql;
-using Hangfire.States;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Serilog;
-using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,22 +29,8 @@ builder.Host.UseSerilog();
 
 builder.Services.AddDevAutomationCore(builder.Configuration);
 builder.Services.AddDevAutomationInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<KafkaAgentWorker>();
 builder.Services.AddEndpointsApiExplorer();
-
-var postgresConnectionString = builder.Configuration.GetConnectionString("Postgres")
-    ?? "Host=postgres;Port=5432;Database=devautomation;Username=devautomation;Password=devautomation";
-
-builder.Services.AddHangfire(configuration => configuration
-    .UseSimpleAssemblyNameTypeSerializer()
-    .UseRecommendedSerializerSettings()
-    .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(postgresConnectionString)));
-
-var agentOptions = builder.Configuration.GetSection(AgentOptions.SectionName).Get<AgentOptions>() ?? new AgentOptions();
-builder.Services.AddHangfireServer(options =>
-{
-    options.WorkerCount = Math.Max(1, agentOptions.MaxConcurrentAgents);
-    options.Queues = ["agents", "default"];
-});
 
 var app = builder.Build();
 
@@ -58,11 +42,10 @@ if (app.Configuration.GetValue("Database:ApplyMigrations", true))
 }
 
 app.UseSerilogRequestLogging();
-app.UseHangfireDashboard("/hangfire");
 
 app.MapGet("/health", async (
     DevAutomationDbContext dbContext,
-    IOptions<RedisOptions> redisOptions,
+    IOptions<QueueOptions> queueOptions,
     CancellationToken cancellationToken) =>
 {
     var checks = new Dictionary<string, string>();
@@ -70,13 +53,16 @@ app.MapGet("/health", async (
 
     try
     {
-        await using var redis = await ConnectionMultiplexer.ConnectAsync(redisOptions.Value.ConnectionString);
-        await redis.GetDatabase().PingAsync();
-        checks["redis"] = "ok";
+        using var adminClient = new AdminClientBuilder(new AdminClientConfig
+        {
+            BootstrapServers = queueOptions.Value.KafkaBootstrapServers
+        }).Build();
+        var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(3));
+        checks["kafka"] = metadata.Brokers.Count > 0 ? "ok" : "failed: no brokers discovered";
     }
     catch (Exception ex)
     {
-        checks["redis"] = $"failed: {ex.Message}";
+        checks["kafka"] = $"failed: {ex.Message}";
     }
 
     try
@@ -96,15 +82,15 @@ app.MapGet("/health", async (
 app.MapPost("/api/tickets", async (
     CreateTicketRequest request,
     DevAutomationDbContext dbContext,
-    IBackgroundJobClient jobs,
-    DevAutomation.Core.Abstractions.IClock clock,
+    ITicketQueue ticketQueue,
+    IClock clock,
     CancellationToken cancellationToken) =>
 {
     var ticket = Ticket.Create(request.Title, request.Description, request.RepoUrl, request.BaseBranch, clock.UtcNow);
     await dbContext.Tickets.AddAsync(ticket, cancellationToken);
     await dbContext.SaveChangesAsync(cancellationToken);
 
-    jobs.Create<AgentJob>(job => job.RunAsync(ticket.Id), new EnqueuedState("agents"));
+    await ticketQueue.EnqueueAgentJobAsync(ticket.Id, cancellationToken);
     return Results.Created($"/api/tickets/{ticket.Id}", TicketResponse.From(ticket));
 });
 
@@ -136,9 +122,9 @@ app.MapGet("/api/tickets", async (
 app.MapPost("/api/tickets/{id:guid}/cancel", async (
     Guid id,
     DevAutomationDbContext dbContext,
-    DevAutomation.Core.Abstractions.IAgentRunner agentRunner,
+    IAgentRunner agentRunner,
     TicketStateMachine stateMachine,
-    DevAutomation.Core.Abstractions.IClock clock,
+    IClock clock,
     CancellationToken cancellationToken) =>
 {
     var ticket = await dbContext.Tickets.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);

@@ -3,14 +3,14 @@
 ## 무엇을 하는 기능인가
 
 사용자가 개발 요구사항을 티켓으로 등록하면 ReplaceMe가 이를 DB에 저장하고,
-즉시 Hangfire `agents` 큐에 에이전트 실행 잡을 등록합니다. 이후 API로 티켓
-상태, 목록, 로그를 확인하거나 실행 중인 티켓을 취소할 수 있습니다.
+즉시 Kafka topic에 에이전트 실행 메시지를 발행합니다. 이후 API로 티켓 상태,
+목록, 로그를 확인하거나 실행 중인 티켓을 취소할 수 있습니다.
 
 ## 구현된 엔드포인트
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
-| `POST` | `/api/tickets` | 티켓 생성 + Hangfire agent job enqueue |
+| `POST` | `/api/tickets` | 티켓 생성 + Kafka agent job enqueue |
 | `GET` | `/api/tickets/{id}` | 단일 티켓 상태 조회 |
 | `GET` | `/api/tickets` | 상태 필터와 페이징을 지원하는 목록 조회 |
 | `POST` | `/api/tickets/{id}/cancel` | 티켓 취소 + 연결된 컨테이너 중지 시도 |
@@ -39,7 +39,7 @@
 ```mermaid
 stateDiagram-v2
     [*] --> Pending: ticket created
-    Pending --> Running: Hangfire job starts
+    Pending --> Running: Kafka worker starts
     Running --> WaitingApproval: approval_prompt called
     WaitingApproval --> Running: approved / rejected handled
     Running --> Completed: agent succeeded
@@ -53,7 +53,7 @@ stateDiagram-v2
 ```
 
 - `Pending`: 티켓 생성 직후
-- `Running`: Hangfire job이 시작되어 agent container가 실행 중
+- `Running`: Kafka worker가 시작되어 agent container가 실행 중
 - `WaitingApproval`: MCP approval tool이 Slack 승인을 기다리는 중
 - `Completed`: agent container가 성공 종료하고 PR URL을 기록한 상태
 - `Failed`: agent timeout, container exit code, 예외 발생

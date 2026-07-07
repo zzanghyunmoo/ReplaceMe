@@ -9,7 +9,7 @@
   보는 HTML 요약
 - [`features/ticket-management.md`](./features/ticket-management.md) — 티켓 API와
   상태 전이
-- [`features/agent-execution.md`](./features/agent-execution.md) — Hangfire/Docker
+- [`features/agent-execution.md`](./features/agent-execution.md) — Kafka/Docker
   기반 Claude Code 실행
 - [`features/approval-flow.md`](./features/approval-flow.md) — MCP
   `approval_prompt` 승인 플로우
