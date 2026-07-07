@@ -8,13 +8,44 @@ worker는 같은 `DevAutomationDbContext`를 사용하고, Serilog는 콘솔과 
 
 ## 데이터 모델
 
-<!-- markdownlint-disable MD013 -->
-| 테이블 | 엔티티 | 역할 |
-| --- | --- | --- |
-| `tickets` | `Ticket` | 개발 요구사항, 상태, PR URL, container id |
-| `approval_requests` | `ApprovalRequest` | Slack 승인 요청, 상태, 응답자, 메시지 timestamp |
-| `execution_logs` | `ExecutionLog` | agent stream-json/stdout 로그 |
-<!-- markdownlint-enable MD013 -->
+```mermaid
+erDiagram
+    TICKET ||--o{ APPROVAL_REQUEST : has
+    TICKET ||--o{ EXECUTION_LOG : records
+
+    TICKET {
+        uuid Id
+        string Title
+        string RepoUrl
+        string BaseBranch
+        string Status
+        datetime CreatedAt
+        datetime StartedAt
+        datetime CompletedAt
+        string PrUrl
+        string ContainerId
+    }
+
+    APPROVAL_REQUEST {
+        uuid Id
+        uuid TicketId
+        string ToolName
+        jsonb InputJson
+        string Status
+        datetime RequestedAt
+        datetime RespondedAt
+        string ResponderSlackId
+        string SlackMessageTs
+    }
+
+    EXECUTION_LOG {
+        uuid Id
+        uuid TicketId
+        datetime Timestamp
+        string EventType
+        string Content
+    }
+```
 
 ## 주요 필드
 
@@ -64,13 +95,13 @@ API 시작 시 `Database:ApplyMigrations`가 `true`이면 자동으로
 
 Agent container 로그는 다음 흐름으로 저장됩니다.
 
-```text
-Docker stdout/stderr
-  -> StreamLogsAsync
-  -> SecretRedactor
-  -> ClaudeStreamParser
-  -> AgentJob log buffer
-  -> execution_logs table
+```mermaid
+flowchart LR
+    A[Docker stdout/stderr] --> B[StreamLogsAsync]
+    B --> C[SecretRedactor]
+    C --> D[ClaudeStreamParser]
+    D --> E[AgentJob log buffer]
+    E --> F[(execution_logs table)]
 ```
 
 - JSON line: `type` 값을 event type으로 사용

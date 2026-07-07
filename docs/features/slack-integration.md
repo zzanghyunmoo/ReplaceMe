@@ -23,14 +23,28 @@ Slack interactivity webhook은 서명 검증을 통과한 요청만 처리하고
 
 ## Slack 버튼 처리 흐름
 
-```text
-Slack button click
-  -> POST /api/slack/interactivity
-  -> X-Slack-Signature 검증
-  -> payload 파싱
-  -> action_id 확인
-  -> ApprovalRequest Pending row를 Approved/Rejected로 업데이트
-  -> Slack 원본 메시지 업데이트
+```mermaid
+sequenceDiagram
+    participant User as Slack user
+    participant Slack as Slack
+    participant API as /api/slack/interactivity
+    participant Verifier as SlackSignatureVerifier
+    participant Service as SlackInteractivityService
+    participant DB as PostgreSQL
+    participant Notifier as SlackApprovalNotifier
+
+    User->>Slack: 승인 또는 거절 버튼 클릭
+    Slack->>API: signed interactivity payload
+    API->>Verifier: timestamp + body + signature 검증
+    alt invalid signature
+        API-->>Slack: 401 Unauthorized
+    else valid signature
+        API->>Service: HandlePayloadAsync(payload)
+        Service->>DB: Pending row -> Approved/Rejected
+        Service->>Notifier: UpdateApprovalResultAsync
+        Notifier->>Slack: chat.update 원본 메시지 정리
+        API-->>Slack: 200 OK
+    end
 ```
 
 ## 보안: Slack 서명 검증

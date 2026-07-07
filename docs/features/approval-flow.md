@@ -8,16 +8,28 @@ Claude Code가 민감한 작업을 수행하려고 할 때 `approval_prompt` MCP
 
 ## 구성 요소
 
-```text
-Claude Code permission prompt
-  -> MCP stdio server: DevAutomation.ApprovalMcp
-  -> approval_prompt tool
-  -> ApprovalService
-  -> ApprovalRequest DB row
-  -> Slack Block Kit message
-  -> Slack button click webhook
-  -> ApprovalRequest status update
-  -> allow/deny JSON response
+```mermaid
+sequenceDiagram
+    participant Claude as Claude Code
+    participant MCP as Approval MCP server
+    participant Tool as approval_prompt
+    participant Service as ApprovalService
+    participant DB as PostgreSQL
+    participant Slack as Slack
+
+    Claude->>MCP: permission prompt tool call
+    MCP->>Tool: approval_prompt(args)
+    Tool->>DB: Ticket -> WaitingApproval
+    Tool->>Service: RequestApprovalAsync(notification)
+    Service->>DB: ApprovalRequest Pending 저장
+    Service->>Slack: Block Kit 승인 메시지 전송
+    loop Poll until decision or timeout
+        Service->>DB: ApprovalRequest 상태 조회
+    end
+    Slack-->>DB: webhook이 Approved/Rejected 반영
+    Service-->>Tool: allow 또는 deny 결정
+    Tool->>DB: Ticket -> Running
+    Tool-->>Claude: { behavior: allow | deny }
 ```
 
 ## MCP tool 입력
@@ -66,8 +78,10 @@ Claude Code permission prompt
 `approval_prompt`가 호출되면 실행 중인 티켓은 `WaitingApproval`로 바뀝니다.
 승인 결정이 끝나면 다시 `Running`으로 돌아갑니다.
 
-```text
-Running -> WaitingApproval -> Running
+```mermaid
+stateDiagram-v2
+    Running --> WaitingApproval: approval_prompt called
+    WaitingApproval --> Running: decision returned
 ```
 
 이 상태 변경도 Slack ticket notification으로 전송됩니다.

@@ -8,17 +8,23 @@
 
 ## 실행 흐름
 
-```text
-POST /api/tickets
-  -> Ticket 저장
-  -> Hangfire agents queue enqueue
-  -> AgentJob.RunAsync
-  -> DockerAgentRunner.RunAsync
-  -> container: git clone / branch 생성 / claude -p 실행
-  -> 로그 stream-json 파싱 및 DB 저장
-  -> commit/push/PR 생성 시도
-  -> Ticket Completed 또는 Failed
-  -> container force remove
+```mermaid
+flowchart TD
+    A[POST /api/tickets] --> B[Ticket 저장]
+    B --> C[Hangfire agents queue enqueue]
+    C --> D[AgentJob.RunAsync]
+    D --> E[DockerAgentRunner.RunAsync]
+    E --> F[Docker container 생성]
+    F --> G[repo clone + branch 생성]
+    G --> H[claude -p stream-json 실행]
+    H --> I[로그 파싱 + DB 저장]
+    H --> J{변경 사항 있음?}
+    J -- 예 --> K[commit + push + PR 생성 시도]
+    J -- 아니오 --> L[성공 종료]
+    K --> L
+    I --> M[Ticket Completed 또는 Failed]
+    L --> M
+    M --> N[container force remove]
 ```
 
 ## 컨테이너 안에서 하는 일

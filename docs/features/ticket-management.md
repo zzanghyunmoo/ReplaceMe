@@ -36,10 +36,20 @@
 
 현재 티켓 상태는 다음 흐름을 지원합니다.
 
-```text
-Pending -> Running -> WaitingApproval -> Running -> Completed
-Pending -> Running -> Failed
-Pending/Running/WaitingApproval -> Cancelled
+```mermaid
+stateDiagram-v2
+    [*] --> Pending: ticket created
+    Pending --> Running: Hangfire job starts
+    Running --> WaitingApproval: approval_prompt called
+    WaitingApproval --> Running: approved / rejected handled
+    Running --> Completed: agent succeeded
+    Running --> Failed: timeout / exit code / exception
+    Pending --> Cancelled: cancel API
+    Running --> Cancelled: cancel API
+    WaitingApproval --> Cancelled: cancel API
+    Completed --> [*]
+    Failed --> [*]
+    Cancelled --> [*]
 ```
 
 - `Pending`: 티켓 생성 직후

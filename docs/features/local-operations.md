@@ -8,12 +8,16 @@ ReplaceMe는 Docker Compose로 API, PostgreSQL, Redis, agent image를 함께 실
 
 ## 실행 구성
 
-```text
-docker-compose.yml
-  api          -> ASP.NET Core API + Hangfire server
-  postgres    -> ticket/approval/log 저장소
-  redis       -> Redis 연결 확인용 dependency
-  agent-image -> Claude Code + Approval MCP 포함 agent image build target
+```mermaid
+flowchart LR
+    Compose[docker-compose.yml] --> API[api\nASP.NET Core + Hangfire]
+    Compose --> Postgres[(postgres\nticket / approval / logs)]
+    Compose --> Redis[(redis\nhealth dependency)]
+    Compose --> AgentImage[agent-image\nClaude Code + Approval MCP]
+    API --> Postgres
+    API --> Redis
+    API --> DockerSock[/Docker socket/]
+    DockerSock --> AgentImage
 ```
 
 ## 빠른 실행
@@ -58,11 +62,18 @@ http://localhost:8080/hangfire
 
 `GET /health`는 다음 dependency를 확인합니다.
 
-| 항목 | 확인 방식 |
-| --- | --- |
-| DB | `dbContext.Database.CanConnectAsync()` |
-| Redis | `ConnectionMultiplexer.ConnectAsync(...).PingAsync()` |
-| Docker | `DockerClient.System.PingAsync()` |
+```mermaid
+flowchart TD
+    H[GET /health] --> DB{PostgreSQL 연결?}
+    H --> R{Redis ping?}
+    H --> D{Docker daemon ping?}
+    DB -- ok --> OK[200 OK 후보]
+    R -- ok --> OK
+    D -- ok --> OK
+    DB -- failed --> P[Problem response]
+    R -- failed --> P
+    D -- failed --> P
+```
 
 모두 정상이면 `200 OK`, 하나라도 실패하면 `Problem` 응답을 반환합니다.
 
