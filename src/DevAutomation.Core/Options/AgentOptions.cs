@@ -10,6 +10,9 @@ public sealed class AgentOptions
     public string DockerNetwork { get; set; } = "bridge";
     public string AnthropicApiKey { get; set; } = string.Empty;
     public string? GitHubToken { get; set; }
+    public string? GitLabToken { get; set; }
+    public string GitLabApiBaseUrl { get; set; } = "https://gitlab.com/api/v4";
+    public RemoteRepositoryProvider RemoteRepositoryProvider { get; set; } = RemoteRepositoryProvider.GitHub;
     public string GitAuthorName { get; set; } = "DevAutomation Bot";
     public string GitAuthorEmail { get; set; } = "devautomation@example.local";
     public string ApprovalMcpCommand { get; set; } = "dotnet /app/DevAutomation.ApprovalMcp.dll";

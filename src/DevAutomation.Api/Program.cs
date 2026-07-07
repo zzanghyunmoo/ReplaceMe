@@ -177,6 +177,41 @@ app.MapGet("/api/approvals", async (
     return Results.Ok(items);
 });
 
+app.MapPost("/api/approvals/{id:guid}/approve", async (
+    Guid id,
+    DevAutomationDbContext dbContext,
+    IApprovalNotifier notifier,
+    IClock clock,
+    CancellationToken cancellationToken) =>
+{
+    var approval = await dbContext.ApprovalRequests.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    if (approval is null) return Results.NotFound();
+    if (approval.Status != ApprovalStatus.Pending) return Results.Conflict(ApprovalRequestResponse.From(approval));
+
+    approval.Approve("api", clock.UtcNow);
+    await dbContext.SaveChangesAsync(cancellationToken);
+    await notifier.UpdateApprovalResultAsync(approval, cancellationToken);
+    return Results.Ok(ApprovalRequestResponse.From(approval));
+});
+
+app.MapPost("/api/approvals/{id:guid}/reject", async (
+    Guid id,
+    RejectApprovalRequest request,
+    DevAutomationDbContext dbContext,
+    IApprovalNotifier notifier,
+    IClock clock,
+    CancellationToken cancellationToken) =>
+{
+    var approval = await dbContext.ApprovalRequests.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    if (approval is null) return Results.NotFound();
+    if (approval.Status != ApprovalStatus.Pending) return Results.Conflict(ApprovalRequestResponse.From(approval));
+
+    approval.Reject("api", clock.UtcNow, string.IsNullOrWhiteSpace(request.Reason) ? "Rejected via API." : request.Reason.Trim());
+    await dbContext.SaveChangesAsync(cancellationToken);
+    await notifier.UpdateApprovalResultAsync(approval, cancellationToken);
+    return Results.Ok(ApprovalRequestResponse.From(approval));
+});
+
 app.MapPost("/api/slack/interactivity", async (
     HttpRequest request,
     ISlackSignatureVerifier verifier,
