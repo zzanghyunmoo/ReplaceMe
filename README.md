@@ -31,6 +31,11 @@ API는 `http://localhost:8080`에서 실행됩니다. Hangfire dashboard는
 (`devautomation-network`)에 붙어 승인 MCP 서버가 PostgreSQL과 Slack 설정을
 사용할 수 있게 구성됩니다.
 
+## 기능 문서
+
+- [전체 기능 HTML 요약](./docs/feature-overview.html)
+- 기능별 문서 목록: `docs/README.md`
+
 ## 주요 API
 
 ```http
