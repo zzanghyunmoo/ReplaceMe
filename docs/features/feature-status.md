@@ -71,7 +71,7 @@ flowchart TD
 | 승인 | Approval MCP, Slack 버튼 승인/거절, 수동 승인 API | 승인 입력 수정 UI, 거절 사유 modal |
 | 외부 연동 | GitHub/GitLab, Jira/Linear, Notion/Confluence provider 골격, readiness doctor | full end-to-end Linear execution grammar |
 | 운영 | `/health`, readiness profile endpoint, Docker Compose, 로그/telemetry | production manifest, 인증/인가, 운영 hardening |
-| 문서 | 기능 설명 문서, ZZA-51 계획 | Swagger 기반 API 상세 문서 |
+| 문서 | 기능 설명 문서, ZZA-51 계획, 기능별 QA 실 테스트 문서 | Swagger 기반 API 상세 문서 |
 
 ## 처음 읽는 순서
 
@@ -82,6 +82,7 @@ flowchart TD
 5. [`persistence-observability.md`](./persistence-observability.md)에서 어떤 기록이 남는지 봅니다.
 6. [`local-operations.md`](./local-operations.md)에서 로컬 실행과 health check를 확인합니다.
 7. [`readiness-profile.md`](./readiness-profile.md)에서 ZZA-51 readiness profile과 pre-run gate를 확인합니다.
+8. [`../qa/README.md`](../qa/README.md)에서 직접 실행할 QA 체크리스트를 따라갑니다.
 
 ## 용어 빠른 풀이
 

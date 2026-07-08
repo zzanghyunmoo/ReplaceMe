@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | 기능 현황 | [`features/feature-status.md`](./features/feature-status.md) | 현재 구현된 기능과 전체 흐름을 한눈에 봅니다. |
 | 기능 설명 | [`features/`](./features/) | 기능별로 “무엇을 하는지”와 “로직이 어떻게 흐르는지”를 봅니다. |
+| QA 실 테스트 | [`qa/`](./qa/) | 로컬 실행부터 기능 단위 수동 테스트 체크리스트를 봅니다. |
 | 구현 계획 | [`plans/`](./plans/) | 아직 만들 기능을 어떤 순서로 개발할지 봅니다. |
 | 아이디에이션 | [`ideation/`](./ideation/) | 왜 이 방향을 선택했는지 배경을 봅니다. |
 | HTML 요약 | [`feature-overview.html`](./feature-overview.html) | 전체 기능을 시각적으로 빠르게 훑습니다. |
@@ -35,6 +36,8 @@
   설정, 헬스체크
 - [`features/readiness-profile.md`](./features/readiness-profile.md) — ZZA-51
   `personal-github-linear-notion` readiness profile
+- [`qa/README.md`](./qa/README.md) — 로컬 실행부터 기능별 실 테스트를 진행하는
+  QA 문서 목차
 - [`plans/2026-07-08-001-feat-personal-github-linear-notion-profile-plan.md`](./plans/2026-07-08-001-feat-personal-github-linear-notion-profile-plan.md) —
   ZZA-51 `personal-github-linear-notion` readiness profile 구현 계획
 - [`ideation/2026-07-08-replaceme-github-linear-notion-dev-automation-ideation.html`](./ideation/2026-07-08-replaceme-github-linear-notion-dev-automation-ideation.html) —
