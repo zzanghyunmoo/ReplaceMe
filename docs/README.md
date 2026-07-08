@@ -33,6 +33,8 @@
   PostgreSQL 모델, 로그, redaction
 - [`features/local-operations.md`](./features/local-operations.md) — 로컬 실행,
   설정, 헬스체크
+- [`features/readiness-profile.md`](./features/readiness-profile.md) — ZZA-51
+  `personal-github-linear-notion` readiness profile
 - [`plans/2026-07-08-001-feat-personal-github-linear-notion-profile-plan.md`](./plans/2026-07-08-001-feat-personal-github-linear-notion-profile-plan.md) —
   ZZA-51 `personal-github-linear-notion` readiness profile 구현 계획
 - [`ideation/2026-07-08-replaceme-github-linear-notion-dev-automation-ideation.html`](./ideation/2026-07-08-replaceme-github-linear-notion-dev-automation-ideation.html) —

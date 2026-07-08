@@ -11,6 +11,8 @@ execution: code
 
 # Personal GitHub Linear Notion Profile - Plan
 
+<!-- markdownlint-disable -->
+
 ## Goal Capsule
 
 | Field | Value |
@@ -226,7 +228,6 @@ Build the plan in this order so every step has a small proof before the next one
 
 ### V1 Readiness Matrix
 
-<!-- markdownlint-disable MD013 -->
 | Check ID | Surface | Modes | Default severity | Probe | Required config | Failure effect |
 | --- | --- | --- | --- | --- | --- | --- |
 | `local.postgres.connectivity` | Local | GET, Doctor, PreRunGate | required | EF/Core connectivity check | `ConnectionStrings:Postgres` | `IsRunnable=false` |
@@ -240,7 +241,6 @@ Build the plan in this order so every step has a small proof before the next one
 | `secrets.redaction.coverage` | Safety | GET, Doctor, PreRunGate | warning for v1 unless overridden | configured secret labels covered by redactor | secret catalog | warning in report |
 | `report.linear.publish` | Linear report | Doctor, failed PreRunGate publishing | required by default | create/update readiness comment | readiness issue ID | publishing-mode `IsRunnable=false` when required |
 | `report.notion.publish` | Notion report | Doctor, failed PreRunGate publishing | required by default | create/update readiness section | setup page ID | publishing-mode `IsRunnable=false` when required |
-<!-- markdownlint-enable MD013 -->
 
 ### Mode Semantics
 
@@ -660,3 +660,5 @@ Per-unit done criteria:
 - A future CLI binary can wrap the API-first local doctor endpoint if the user wants a dedicated command.
 - A future override policy can allow a human to proceed through required failures, but v1 intentionally fails closed.
 - A future write-probe mode can create disposable GitHub/Linear/Notion artifacts, but v1 should avoid noisy probes unless the user opts in.
+
+<!-- markdownlint-enable -->

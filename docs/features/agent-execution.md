@@ -9,6 +9,7 @@
 
 ## 한눈에 보기
 
+<!-- markdownlint-disable MD013 -->
 | 항목 | 내용 |
 | --- | --- |
 | 시작 조건 | Kafka topic에 agent job message가 들어옵니다. |
@@ -16,6 +17,7 @@
 | 주요 출력 | 실행 로그, 티켓 상태 변경, PR/MR URL입니다. |
 | 실패 시 | 티켓을 `Failed`로 바꾸고 실패 사유를 저장합니다. |
 | 같이 봐야 할 문서 | `ticket-management.md`, `approval-flow.md`, `persistence-observability.md` |
+<!-- markdownlint-enable MD013 -->
 
 ## 실행 흐름
 

@@ -9,6 +9,7 @@ Claude Code가 민감한 작업을 수행하려고 할 때 `approval_prompt` MCP
 
 ## 한눈에 보기
 
+<!-- markdownlint-disable MD013 -->
 | 항목 | 내용 |
 | --- | --- |
 | 시작 조건 | Claude Code가 `approval_prompt` MCP tool을 호출합니다. |
@@ -16,6 +17,7 @@ Claude Code가 민감한 작업을 수행하려고 할 때 `approval_prompt` MCP
 | 주요 출력 | `ApprovalRequest`, notifier message, Claude Code permission response입니다. |
 | 실패 시 | timeout 또는 reject는 `deny` 응답으로 돌아갑니다. |
 | 같이 봐야 할 문서 | `slack-integration.md`, `agent-execution.md` |
+<!-- markdownlint-enable MD013 -->
 
 ## 구성 요소
 

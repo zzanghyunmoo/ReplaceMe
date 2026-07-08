@@ -16,7 +16,8 @@ ReplaceMe의 현재 핵심 흐름은 다음 한 문장으로 요약됩니다.
 flowchart LR
     User[사용자 / 외부 이슈] --> API[ReplaceMe API]
     API --> DB[(PostgreSQL\n티켓 / 승인 / 로그)]
-    API --> Kafka[(Kafka\nagent job queue)]
+    API --> Ready[Readiness gate\noptional profile]
+    Ready --> Kafka[(Kafka\nagent job queue)]
     Kafka --> Worker[KafkaAgentWorker]
     Worker --> Job[AgentJob]
     Job --> Docker[DockerAgentRunner]
@@ -40,7 +41,7 @@ flowchart LR
 | 저장소/관측성 | 티켓, 승인 요청, 실행 로그, telemetry를 저장/노출합니다. | EF Core entities, Docker logs | PostgreSQL rows, Serilog, OTLP | [`persistence-observability.md`](./persistence-observability.md) |
 | 로컬 운영 | Docker Compose로 API/DB/Kafka/agent image를 실행하고 health를 확인합니다. | `.env`, compose services | running API, `/health` result | [`local-operations.md`](./local-operations.md) |
 | 외부 Provider | GitHub/GitLab, Linear/Jira, Notion/Confluence 같은 외부 도구를 교체 가능하게 묶습니다. | provider options, tokens | issue/document/PR integration | Notion: 외부 Provider 연동 개요 |
-| ZZA-51 readiness profile | GitHub/Linear/Notion 개인 자동화 환경이 실행 가능한지 사전 점검합니다. | profile config, provider credentials | readiness report, pre-run gate result | [`../plans/2026-07-08-001-feat-personal-github-linear-notion-profile-plan.md`](../plans/2026-07-08-001-feat-personal-github-linear-notion-profile-plan.md) |
+| ZZA-51 readiness profile | GitHub/Linear/Notion 개인 자동화 환경이 실행 가능한지 사전 점검합니다. | profile config, provider credentials | readiness report, pre-run gate result | [`readiness-profile.md`](./readiness-profile.md) |
 <!-- markdownlint-enable MD013 -->
 
 ## 기능 간 의존 관계
@@ -68,8 +69,8 @@ flowchart TD
 | --- | --- | --- |
 | 실행 흐름 | 티켓 생성, Kafka enqueue, Docker agent 실행, PR/MR 생성 | 실패 재시도, DLQ, run replay |
 | 승인 | Approval MCP, Slack 버튼 승인/거절, 수동 승인 API | 승인 입력 수정 UI, 거절 사유 modal |
-| 외부 연동 | GitHub/GitLab, Jira/Linear, Notion/Confluence provider 골격 | provider readiness doctor, 자동 setup page 갱신 |
-| 운영 | `/health`, Docker Compose, 로그/telemetry | production manifest, 인증/인가, 운영 hardening |
+| 외부 연동 | GitHub/GitLab, Jira/Linear, Notion/Confluence provider 골격, readiness doctor | full end-to-end Linear execution grammar |
+| 운영 | `/health`, readiness profile endpoint, Docker Compose, 로그/telemetry | production manifest, 인증/인가, 운영 hardening |
 | 문서 | 기능 설명 문서, ZZA-51 계획 | Swagger 기반 API 상세 문서 |
 
 ## 처음 읽는 순서
@@ -80,7 +81,7 @@ flowchart TD
 4. [`approval-flow.md`](./approval-flow.md)와 [`slack-integration.md`](./slack-integration.md)에서 사람 승인 흐름을 봅니다.
 5. [`persistence-observability.md`](./persistence-observability.md)에서 어떤 기록이 남는지 봅니다.
 6. [`local-operations.md`](./local-operations.md)에서 로컬 실행과 health check를 확인합니다.
-7. ZZA-51 계획에서 다음으로 만들 readiness profile을 확인합니다.
+7. [`readiness-profile.md`](./readiness-profile.md)에서 ZZA-51 readiness profile과 pre-run gate를 확인합니다.
 
 ## 용어 빠른 풀이
 

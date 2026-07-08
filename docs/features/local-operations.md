@@ -89,8 +89,26 @@ flowchart TD
 모두 정상이면 `200 OK`, 하나라도 실패하면 `Problem` 응답을 반환합니다.
 
 `/health`는 서비스 dependency 확인용입니다. GitHub, Linear, Notion 권한까지
-확인하는 기능은 ZZA-51 `personal-github-linear-notion` readiness profile에서 별도
-endpoint로 추가할 예정입니다.
+확인하는 기능은 `personal-github-linear-notion` readiness profile endpoint에서 따로
+확인합니다.
+
+## Readiness profile 확인
+
+`personal-github-linear-notion` profile은 agent run 전에 GitHub, Linear, Notion,
+Docker, Kafka, PostgreSQL, agent image, secret redaction 준비 상태를 확인합니다.
+
+```bash
+# 조회 전용: Linear/Notion에 쓰지 않음
+curl http://localhost:8080/api/readiness/profiles/personal-github-linear-notion
+
+# 수동 doctor: 설정된 경우 Linear/Notion에 readiness report를 남김
+curl -X POST http://localhost:8080/api/readiness/profiles/personal-github-linear-notion/doctor
+```
+
+`DEVAUTOMATION_ProfileReadiness__SelectedProfile=personal-github-linear-notion`을
+설정하면 `/api/tickets`와 `AgentJob.RunAsync` 앞에서 pre-run gate가 동작합니다.
+required check가 실패하면 ticket 생성은 `409 ProblemDetails`로 막히고, 이미 queued
+된 ticket은 `Failed` 상태와 `Readiness gate blocked:` 사유를 남깁니다.
 
 ## 개발 검증 명령
 
