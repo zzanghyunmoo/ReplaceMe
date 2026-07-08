@@ -1,11 +1,14 @@
 using DevAutomation.Core.Abstractions;
 using DevAutomation.Core.Entities;
+using DevAutomation.Core.Options;
+using DevAutomation.Core.Readiness;
 using DevAutomation.Core.Services;
 using System.Diagnostics;
 using DevAutomation.Infrastructure.Persistence;
 using DevAutomation.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace DevAutomation.Infrastructure.Agents;
 
@@ -15,6 +18,8 @@ public sealed class AgentJob
     private readonly IAgentRunner _agentRunner;
     private readonly ITicketNotifier _ticketNotifier;
     private readonly IIssueTrackerService _issueTrackerService;
+    private readonly IProfileReadinessService _readinessService;
+    private readonly ProfileReadinessOptions _profileReadinessOptions;
     private readonly IClock _clock;
     private readonly TicketStateMachine _stateMachine;
     private readonly ILogger<AgentJob> _logger;
@@ -24,6 +29,8 @@ public sealed class AgentJob
         IAgentRunner agentRunner,
         ITicketNotifier ticketNotifier,
         IIssueTrackerService issueTrackerService,
+        IProfileReadinessService readinessService,
+        IOptions<ProfileReadinessOptions> profileReadinessOptions,
         IClock clock,
         TicketStateMachine stateMachine,
         ILogger<AgentJob> logger)
@@ -32,6 +39,8 @@ public sealed class AgentJob
         _agentRunner = agentRunner;
         _ticketNotifier = ticketNotifier;
         _issueTrackerService = issueTrackerService;
+        _readinessService = readinessService;
+        _profileReadinessOptions = profileReadinessOptions.Value;
         _clock = clock;
         _stateMachine = stateMachine;
         _logger = logger;
@@ -51,6 +60,21 @@ public sealed class AgentJob
         if (ticket.Status == TicketStatus.Cancelled)
         {
             return;
+        }
+
+        if (_profileReadinessOptions.IsPreRunGateEnabled)
+        {
+            var readiness = await _readinessService.EvaluateAsync(_profileReadinessOptions.SelectedProfile, ProfileReadinessMode.PreRunGate, cancellationToken);
+            if (!readiness.IsRunnable)
+            {
+                ticket.MarkFailed(_clock.UtcNow, $"Readiness gate blocked: {readiness.Summary}");
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                await _issueTrackerService.NotifyFailedAsync(ticket, ticket.FailReason ?? "Readiness gate blocked.", cancellationToken);
+                await _ticketNotifier.NotifyStatusChangedAsync(ticket, cancellationToken);
+                DevAutomationTelemetry.AgentJobsFailed.Add(1, new KeyValuePair<string, object?>("agent.result", "readiness_blocked"));
+                activity?.SetTag("ticket.status", ticket.Status.ToString());
+                return;
+            }
         }
 
         var logBuffer = new List<ExecutionLog>();

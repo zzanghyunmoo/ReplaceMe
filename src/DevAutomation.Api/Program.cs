@@ -2,9 +2,11 @@ using System.Text;
 using Confluent.Kafka;
 using DevAutomation.Core.Abstractions;
 using DevAutomation.Core.Contracts;
+using DevAutomation.Core.Contracts.Readiness;
 using DevAutomation.Core.Entities;
 using DevAutomation.Core.Options;
 using DevAutomation.Core.Services;
+using DevAutomation.Core.Readiness;
 using DevAutomation.Infrastructure.DependencyInjection;
 using DevAutomation.Infrastructure.Persistence;
 using DevAutomation.Infrastructure.Queues;
@@ -123,15 +125,48 @@ app.MapGet("/health", async (
     return checks.Values.All(x => x == "ok") ? Results.Ok(checks) : Results.Problem(title: "Unhealthy", extensions: new Dictionary<string, object?> { ["checks"] = checks });
 });
 
+app.MapGet("/api/readiness/profiles/{profileName}", async (
+    string profileName,
+    IProfileReadinessService readinessService,
+    CancellationToken cancellationToken) =>
+{
+    var report = await readinessService.EvaluateAsync(profileName, ProfileReadinessMode.Inspect, cancellationToken);
+    return Results.Ok(ProfileReadinessReportResponse.From(report));
+});
+
+app.MapPost("/api/readiness/profiles/{profileName}/doctor", async (
+    string profileName,
+    IProfileReadinessService readinessService,
+    CancellationToken cancellationToken) =>
+{
+    var report = await readinessService.EvaluateAsync(profileName, ProfileReadinessMode.Doctor, cancellationToken);
+    return Results.Ok(ProfileReadinessReportResponse.From(report));
+});
+
 app.MapPost("/api/tickets", async (
     CreateTicketRequest request,
     DevAutomationDbContext dbContext,
     ITicketQueue ticketQueue,
     IIssueTrackerService issueTrackerService,
     IOptions<IssueTrackerOptions> issueTrackerOptions,
+    IOptions<ProfileReadinessOptions> profileReadinessOptions,
+    IProfileReadinessService readinessService,
     IClock clock,
     CancellationToken cancellationToken) =>
 {
+    if (profileReadinessOptions.Value.IsPreRunGateEnabled)
+    {
+        var readiness = await readinessService.EvaluateAsync(profileReadinessOptions.Value.SelectedProfile, ProfileReadinessMode.PreRunGate, cancellationToken);
+        if (!readiness.IsRunnable)
+        {
+            return Results.Problem(
+                title: "Readiness gate blocked ticket creation",
+                detail: readiness.Summary,
+                statusCode: StatusCodes.Status409Conflict,
+                extensions: new Dictionary<string, object?> { ["readiness"] = ProfileReadinessReportResponse.From(readiness) });
+        }
+    }
+
     var ticket = Ticket.Create(request.Title, request.Description, request.RepoUrl, request.BaseBranch, clock.UtcNow);
     var issueProvider = issueTrackerOptions.Value.Provider;
     var hasExternalIssueReference = !string.IsNullOrWhiteSpace(request.ExternalIssueId)
@@ -337,3 +372,5 @@ app.MapPost("/api/slack/interactivity", async (
 });
 
 app.Run();
+
+public partial class Program { }

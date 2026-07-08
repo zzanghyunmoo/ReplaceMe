@@ -28,6 +28,7 @@ public sealed class DockerAgentRunner : IAgentRunner, IDisposable
         IOptions<AgentOptions> options,
         IOptions<CodingAgentOptions> codingAgentOptions,
         IConfiguration configuration,
+        SecretRedactor redactor,
         IRemoteRepositoryIntegration remoteRepository,
         ICodingAgentIntegration codingAgent,
         ILogger<DockerAgentRunner> logger)
@@ -39,15 +40,7 @@ public sealed class DockerAgentRunner : IAgentRunner, IDisposable
         _codingAgent = codingAgent;
         _logger = logger;
         _dockerClient = new DockerClientConfiguration().CreateClient();
-        _redactor = new SecretRedactor([
-            _options.AnthropicApiKey,
-            _options.GitHubToken,
-            _options.GitLabToken,
-            _configuration["Slack:BotToken"],
-            _configuration["Slack:SigningSecret"],
-            _configuration["Jira:ApiToken"],
-            _configuration["Linear:ApiKey"]
-        ]);
+        _redactor = redactor;
     }
 
     public async Task<AgentRunResult> RunAsync(

@@ -9,6 +9,11 @@ public sealed class SecretRedactor
         _secrets = secrets.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!).Distinct().ToArray();
     }
 
+    public bool Covers(string? secret)
+    {
+        return string.IsNullOrWhiteSpace(secret) || _secrets.Contains(secret, StringComparer.Ordinal);
+    }
+
     public string Redact(string content)
     {
         var result = content ?? string.Empty;

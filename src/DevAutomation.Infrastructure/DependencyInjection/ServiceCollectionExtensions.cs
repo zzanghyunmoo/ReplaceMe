@@ -1,6 +1,7 @@
 using DevAutomation.Core.Abstractions;
 using DevAutomation.Core.Entities;
 using DevAutomation.Core.Options;
+using DevAutomation.Core.Readiness;
 using DevAutomation.Core.Services;
 using DevAutomation.Infrastructure.Agents;
 using DevAutomation.Infrastructure.CodingAgents;
@@ -9,6 +10,9 @@ using DevAutomation.Infrastructure.IssueTrackers;
 using DevAutomation.Infrastructure.Notifications;
 using DevAutomation.Infrastructure.Persistence;
 using DevAutomation.Infrastructure.Queues;
+using DevAutomation.Infrastructure.Readiness;
+using DevAutomation.Infrastructure.Readiness.Checks;
+using DevAutomation.Infrastructure.Readiness.Publishers;
 using DevAutomation.Infrastructure.RemoteRepositories;
 using DevAutomation.Infrastructure.Slack;
 using Microsoft.Extensions.Configuration;
@@ -35,6 +39,7 @@ public static class ServiceCollectionExtensions
         services.Configure<NotionOptions>(configuration.GetSection(NotionOptions.SectionName));
         services.Configure<ConfluenceOptions>(configuration.GetSection(ConfluenceOptions.SectionName));
         services.Configure<CodingAgentOptions>(configuration.GetSection(CodingAgentOptions.SectionName));
+        services.Configure<ProfileReadinessOptions>(configuration.GetSection(ProfileReadinessOptions.SectionName));
 
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<TicketStateMachine>();
@@ -53,6 +58,20 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IIssueTrackerService, IssueTrackerService>();
         services.AddScoped<IDocumentToolService, DocumentToolService>();
         services.AddScoped<ITicketQueue, KafkaTicketQueue>();
+        services.AddSingleton<ISecretCatalog, SecretCatalog>();
+        services.AddSingleton(sp => new SecretRedactor(sp.GetRequiredService<ISecretCatalog>().GetSecrets().Select(x => x.Value)));
+        services.AddScoped<IProfileReadinessService, ProfileReadinessService>();
+        services.AddScoped<IProfileReadinessCheck, PostgresReadinessCheck>();
+        services.AddScoped<IProfileReadinessCheck, KafkaReadinessCheck>();
+        services.AddScoped<IProfileReadinessCheck, DockerReadinessCheck>();
+        services.AddScoped<IProfileReadinessCheck, AgentImageReadinessCheck>();
+        services.AddHttpClient<IProfileReadinessCheck, GitHubRepositoryReadinessCheck>();
+        services.AddScoped<IProfileReadinessCheck, GitHubReadinessCheck>();
+        services.AddHttpClient<IProfileReadinessCheck, LinearReadinessCheck>();
+        services.AddHttpClient<IProfileReadinessCheck, NotionReadinessCheck>();
+        services.AddScoped<IProfileReadinessCheck, SecretRedactionReadinessCheck>();
+        services.AddHttpClient<IReadinessReportPublisher, LinearReadinessReportPublisher>();
+        services.AddHttpClient<IReadinessReportPublisher, NotionReadinessReportPublisher>();
 
         var notifierOptions = configuration.GetSection(NotifierOptions.SectionName).Get<NotifierOptions>() ?? new NotifierOptions();
         switch (notifierOptions.Provider)
