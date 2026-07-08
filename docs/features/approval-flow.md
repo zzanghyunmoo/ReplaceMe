@@ -7,6 +7,16 @@ Claude Code가 민감한 작업을 수행하려고 할 때 `approval_prompt` MCP
 사용자가 승인/거절하거나 timeout될 때까지 대기한 뒤 Claude Code permission prompt
 규격의 JSON 응답을 반환합니다.
 
+## 한눈에 보기
+
+| 항목 | 내용 |
+| --- | --- |
+| 시작 조건 | Claude Code가 `approval_prompt` MCP tool을 호출합니다. |
+| 핵심 책임 | 승인 요청 저장, notifier 전송, 결정 polling, allow/deny 반환입니다. |
+| 주요 출력 | `ApprovalRequest`, notifier message, Claude Code permission response입니다. |
+| 실패 시 | timeout 또는 reject는 `deny` 응답으로 돌아갑니다. |
+| 같이 봐야 할 문서 | `slack-integration.md`, `agent-execution.md` |
+
 ## 구성 요소
 
 ```mermaid
@@ -123,6 +133,19 @@ stateDiagram-v2
 3. 티켓을 생성해 agent가 민감 작업을 요청하게 합니다.
 4. active notifier에 승인 요청이 전달되는지 확인합니다.
 5. 승인/거절 또는 timeout 후 `/api/approvals`에서 상태를 조회합니다.
+
+기대 결과:
+
+- 승인 요청이 만들어지면 티켓 상태가 `WaitingApproval`로 바뀝니다.
+- 사용자가 승인하면 Claude Code에는 `behavior: allow`가 반환됩니다.
+- 사용자가 거절하거나 timeout되면 `behavior: deny`가 반환됩니다.
+- 결정 후 티켓 상태는 다시 `Running`으로 돌아가고 agent가 다음 판단을 합니다.
+
+실패하면 먼저 볼 곳:
+
+- `/api/approvals`
+- active notifier 로그
+- `ApprovalRequest.ResponseReason`
 
 ## 현재 한계
 

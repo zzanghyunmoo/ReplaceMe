@@ -6,6 +6,16 @@ ReplaceMe는 Docker Compose로 API, PostgreSQL, Kafka, agent image를 함께 실
 수 있게 구성되어 있습니다. `/health` endpoint로 PostgreSQL, Kafka, Docker daemon
 연결 상태를 확인합니다.
 
+## 한눈에 보기
+
+| 항목 | 내용 |
+| --- | --- |
+| 시작 조건 | `.env`를 준비하고 Docker Compose를 실행합니다. |
+| 핵심 책임 | 로컬 API, DB, Kafka, agent image를 함께 띄웁니다. |
+| 주요 확인 | `/health`, compose container 상태, test 명령입니다. |
+| 실패 시 | DB/Kafka/Docker 연결 문제를 먼저 확인합니다. |
+| ZZA-51 이후 | `/health`와 별도로 profile readiness endpoint가 추가될 예정입니다. |
+
 ## 실행 구성
 
 ```mermaid
@@ -78,6 +88,10 @@ flowchart TD
 
 모두 정상이면 `200 OK`, 하나라도 실패하면 `Problem` 응답을 반환합니다.
 
+`/health`는 서비스 dependency 확인용입니다. GitHub, Linear, Notion 권한까지
+확인하는 기능은 ZZA-51 `personal-github-linear-notion` readiness profile에서 별도
+endpoint로 추가할 예정입니다.
+
 ## 개발 검증 명령
 
 ```bash
@@ -85,6 +99,13 @@ dotnet restore DevAutomation.sln
 dotnet build DevAutomation.sln
 dotnet test DevAutomation.sln
 ```
+
+기대 결과:
+
+1. restore가 NuGet package를 정상 복원합니다.
+2. build가 compile error 없이 끝납니다.
+3. test가 domain/service/infrastructure test를 통과합니다.
+4. `/health`는 DB/Kafka/Docker가 준비된 로컬 환경에서 `200 OK`를 반환합니다.
 
 로컬 머신에 .NET 8 runtime이 없다면 Docker SDK 이미지로 테스트할 수 있습니다.
 

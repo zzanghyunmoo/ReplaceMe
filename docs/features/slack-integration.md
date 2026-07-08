@@ -10,6 +10,16 @@ ReplaceMe는 Slack을 두 가지 용도로 사용합니다.
 Slack interactivity webhook은 서명 검증을 통과한 요청만 처리하고, 승인 결과를
 원본 메시지에 반영합니다.
 
+## 한눈에 보기
+
+| 항목 | 내용 |
+| --- | --- |
+| 시작 조건 | 티켓 상태가 바뀌거나 approval request가 생성됩니다. |
+| 핵심 책임 | Slack 메시지 전송, 승인/거절 버튼 처리, 서명 검증입니다. |
+| 주요 출력 | Slack channel message와 approval result update입니다. |
+| 실패 시 | signature 실패는 `401`, 설정 누락은 skip log로 남깁니다. |
+| 같이 봐야 할 문서 | `approval-flow.md`, `ticket-management.md` |
+
 ## 알림 종류
 
 | 상황 | Slack 동작 |
@@ -90,6 +100,19 @@ POST http://localhost:8080/api/slack/interactivity
 
 Slack App 설정에서 interactivity request URL을 위 endpoint로 연결합니다.
 로컬에서 테스트하려면 ngrok 같은 tunnel이 필요합니다.
+
+기대 결과:
+
+1. 티켓 상태가 바뀌면 channel에 상태 메시지가 전송됩니다.
+2. approval request가 생기면 승인/거절 버튼 메시지가 전송됩니다.
+3. Slack 사용자가 버튼을 누르면 원본 메시지가 결과 요약으로 업데이트됩니다.
+4. 잘못된 서명이나 오래된 timestamp 요청은 `401 Unauthorized`가 됩니다.
+
+주의:
+
+- `POST /api/slack/interactivity`는 Slack 서명 payload가 필요하므로 단순 curl로는
+  성공 케이스를 재현하기 어렵습니다.
+- 로컬 테스트는 ngrok 등으로 Slack이 접근 가능한 URL을 만들어야 합니다.
 
 ## 현재 한계
 
