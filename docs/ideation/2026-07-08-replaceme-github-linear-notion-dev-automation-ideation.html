@@ -1,0 +1,1188 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>아이디에이션: ReplaceMe 개인 개발 자동화</title>
+    <style>
+      :root {
+        --bg: #f7f8fc;
+        --surface: #ffffff;
+        --ink: #172033;
+        --muted: #5d6878;
+        --line: #d9dfeb;
+        --accent: #3b5bfd;
+        --accent-soft: #eef2ff;
+        --accent-text: #2637a8;
+        --green-soft: #ecfdf5;
+        --green-text: #047857;
+        --amber-soft: #fffbeb;
+        --amber-text: #b45309;
+        --rose-soft: #fff1f2;
+        --rose-text: #be123c;
+        --shadow: 0 12px 32px rgba(23, 32, 51, 0.08);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(
+            circle at top left,
+            #e8edff 0,
+            rgba(232, 237, 255, 0) 34rem
+          ),
+          var(--bg);
+        color: var(--ink);
+        font-family:
+          ui-sans-serif,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        line-height: 1.65;
+        word-break: keep-all;
+      }
+      .page {
+        width: min(960px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 44px 0 56px;
+      }
+      header.hero {
+        background: linear-gradient(135deg, #ffffff 0%, #f7f8ff 100%);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        padding: 34px;
+        box-shadow: var(--shadow);
+      }
+      .eyebrow {
+        color: var(--accent-text);
+        font-size: 0.78rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-weight: 850;
+      }
+      h1 {
+        margin: 8px 0 14px;
+        font-size: clamp(2rem, 4vw, 3.1rem);
+        line-height: 1.08;
+        letter-spacing: -0.04em;
+      }
+      h2 {
+        margin: 48px 0 18px;
+        font-size: 1.55rem;
+        letter-spacing: -0.02em;
+      }
+      h3 {
+        margin: 0 0 10px;
+        font-size: 1.16rem;
+      }
+      p,
+      li {
+        max-width: 76ch;
+      }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      code {
+        background: #eef1f7;
+        padding: 0.1rem 0.32rem;
+        border-radius: 0.35rem;
+        font-size: 0.92em;
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 22px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--muted);
+        padding: 7px 11px;
+        font-size: 0.86rem;
+        font-weight: 700;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 14px;
+      }
+      .card,
+      .idea,
+      .callout {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        box-shadow: 0 6px 18px rgba(23, 32, 51, 0.05);
+      }
+      .card {
+        padding: 18px;
+      }
+      .card p {
+        margin: 8px 0 0;
+        color: var(--muted);
+      }
+      .callout {
+        padding: 18px;
+        background: var(--accent-soft);
+        color: #26344f;
+      }
+      .callout strong {
+        color: var(--accent-text);
+      }
+      .simple-list {
+        margin: 0;
+        padding-left: 1.2rem;
+      }
+      .navlist {
+        display: grid;
+        gap: 8px;
+        margin: 12px 0 22px;
+        padding: 0;
+        list-style: none;
+      }
+      .navlist a {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 10px 12px;
+        color: var(--ink);
+        text-decoration: none;
+      }
+      .navlist small {
+        color: var(--muted);
+      }
+      .idea {
+        padding: 24px;
+        margin: 18px 0;
+      }
+      .idea-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 12px;
+      }
+      .rank {
+        flex: 0 0 auto;
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 850;
+      }
+      .idea-title {
+        flex: 1 1 auto;
+      }
+      .metrics {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 12px 0;
+      }
+      .metric {
+        border-radius: 999px;
+        padding: 5px 9px;
+        font-size: 0.78rem;
+        font-weight: 800;
+        background: var(--accent-soft);
+        color: var(--accent-text);
+      }
+      .metric.green {
+        background: var(--green-soft);
+        color: var(--green-text);
+      }
+      .metric.amber {
+        background: var(--amber-soft);
+        color: var(--amber-text);
+      }
+      .field {
+        margin-top: 13px;
+      }
+      .field strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--ink);
+      }
+      .basis {
+        background: #f8fafc;
+        border-radius: 16px;
+        padding: 12px 14px;
+        color: #344154;
+      }
+      .beginner {
+        background: var(--green-soft);
+        color: #174d37;
+        border-radius: 16px;
+        padding: 12px 14px;
+      }
+      .diagram {
+        margin: 18px 0 4px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: #fbfcff;
+        padding: 10px;
+        overflow-x: auto;
+      }
+      .diagram svg {
+        display: block;
+        width: 100%;
+        min-width: 620px;
+        height: auto;
+      }
+      .diagram text {
+        font-family:
+          ui-sans-serif,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        fill: #172033;
+      }
+      .caption {
+        color: var(--muted);
+        font-size: 0.86rem;
+        margin: 6px 4px 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        overflow: hidden;
+      }
+      th,
+      td {
+        padding: 11px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #f0f3fb;
+        color: #2e3b52;
+        font-size: 0.86rem;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      footer {
+        margin-top: 46px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <div class="eyebrow">ce-ideate · 초보 개발자도 읽기 쉬운 버전</div>
+        <h1>ReplaceMe 개인 개발 자동화 아이디어</h1>
+        <p>
+          목표는 단순하다. 내가 쓰는 <strong>GitHub</strong>,
+          <strong>Linear</strong>, <strong>Notion</strong>을 연결해서 “이슈를
+          만들면 코딩 에이전트가 작업하고, PR을 만들고, 결과를 위키에 남기는”
+          개발 자동화 흐름을 만드는 것이다.
+        </p>
+        <div class="meta" aria-label="metadata">
+          <span class="pill"
+            >작성일 · <time datetime="2026-07-08">2026-07-08</time></span
+          >
+          <span class="pill">주제 · ReplaceMe 개인 개발 자동화</span>
+          <span class="pill">모드 · 코드베이스 기반 아이디에이션</span>
+          <span class="pill">결과 · 45개 후보 → 7개 핵심 아이디어</span>
+        </div>
+      </header>
+
+      <section id="quick-read">
+        <h2>먼저 이것만 이해하면 된다</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>Linear의 역할</h3>
+            <p>
+              Linear는 “무슨 일을 할지”를 적고, 작업을 시작/중지/재시도하는
+              <strong>명령판</strong>이다. 쉽게 말해 작업 티켓과 대화가 모이는
+              곳이다.
+            </p>
+          </article>
+          <article class="card">
+            <h3>GitHub의 역할</h3>
+            <p>
+              GitHub는 실제 코드가 바뀌고 PR을 리뷰하는 곳이다. 자동화가
+              성공하려면 PR 본문이 좋아야 한다.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Notion의 역할</h3>
+            <p>
+              Notion은 결과와 배운 점을 남기는
+              <strong>위키/기억 저장소</strong>다. Linear처럼 두 번째 이슈
+              트래커로 쓰지 않는 것이 좋다.
+            </p>
+          </article>
+          <article class="card">
+            <h3>ReplaceMe의 역할</h3>
+            <p>
+              ReplaceMe는 세 도구 사이를 오케스트레이션한다. 이슈를 읽고,
+              에이전트를 실행하고, PR을 만들고, 기록을 남긴다.
+            </p>
+          </article>
+        </div>
+        <div class="callout" style="margin-top: 16px">
+          <strong>읽는 법:</strong> 아래 7개 아이디어는 구현 계획이 아니라 “어떤
+          방향으로 제품을 키울지” 고르기 위한 후보들이다. 다음 단계는 마음에
+          드는 아이디어 하나를 골라 <code>ce-brainstorm</code>으로 요구사항을
+          구체화하는 것이다.
+        </div>
+      </section>
+
+      <section id="grounding-context">
+        <h2>현재 코드에서 확인한 사실</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>이미 있는 흐름</h3>
+            <p>
+              현재 ReplaceMe는 API로 티켓을 만들고, Kafka 큐에 넣고, Docker
+              컨테이너에서 코딩 에이전트를 실행한다. 작업이 끝나면 PR URL, 로그,
+              상태를 저장한다.
+            </p>
+          </article>
+          <article class="card">
+            <h3>이미 붙어 있는 외부 도구</h3>
+            <p>
+              GitHub/GitLab, Linear/Jira, Notion/Confluence 같은 provider 구조가
+              있다. 다만 지금은 “깊게 연결된 제품 경험”보다는 “연동 가능한 기본
+              구조”에 가깝다.
+            </p>
+          </article>
+          <article class="card">
+            <h3>큰 빈틈</h3>
+            <p>
+              Linear는 아직 명령판이라기보다 이슈 생성/댓글 수준이다. GitHub PR
+              본문은 고정 문장이다. Notion 문서는 수동 endpoint로 만드는 정적
+              페이지에 가깝다.
+            </p>
+          </article>
+          <article class="card">
+            <h3>외부 흐름</h3>
+            <p>
+              Linear Coding Sessions, GitHub Copilot in Linear, OpenAI Codex in
+              Linear도 모두 “이슈 → 에이전트 → PR” 흐름으로 가고 있다. 이 방향은
+              시장적으로도 자연스럽다.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="topic-axes">
+        <h2>생각을 나눈 5가지 축</h2>
+        <div class="grid">
+          <div class="card">
+            <strong>1. Linear 명령판</strong>
+            <p>이슈를 어떻게 실행 가능한 작업 지시서로 만들까?</p>
+          </div>
+          <div class="card">
+            <strong>2. GitHub PR 리뷰 흐름</strong>
+            <p>에이전트가 만든 PR을 어떻게 믿고 리뷰하게 할까?</p>
+          </div>
+          <div class="card">
+            <strong>3. Notion 기억 저장소</strong>
+            <p>작업 결과와 배운 점을 어떻게 위키에 남길까?</p>
+          </div>
+          <div class="card">
+            <strong>4. 실행 기록과 안전성</strong>
+            <p>무슨 일이 일어났는지 어떻게 추적하고 재시도할까?</p>
+          </div>
+          <div class="card">
+            <strong>5. 개인 환경 설정/건강검사</strong>
+            <p>토큰, 권한, Docker, CLI가 준비됐는지 어떻게 미리 확인할까?</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="ranked-ideas">
+        <h2>추천 아이디어 7개</h2>
+        <ul class="navlist" aria-label="Ranked ideas jump list">
+          <li>
+            <a href="#idea-1"
+              ><span>1. 개인 자동화 프로필</span><small>추천도 88%</small></a
+            >
+          </li>
+          <li>
+            <a href="#idea-2"
+              ><span>2. Linear 이슈를 실행 지시서로 만들기</span
+              ><small>추천도 86%</small></a
+            >
+          </li>
+          <li>
+            <a href="#idea-3"
+              ><span>3. Run Passport</span><small>추천도 84%</small></a
+            >
+          </li>
+          <li>
+            <a href="#idea-4"
+              ><span>4. PR 리뷰 패킷</span><small>추천도 82%</small></a
+            >
+          </li>
+          <li>
+            <a href="#idea-5"
+              ><span>5. 살아있는 Notion 작업 문서</span
+              ><small>추천도 80%</small></a
+            >
+          </li>
+          <li>
+            <a href="#idea-6"
+              ><span>6. Provider Doctor + 로컬 안전문</span
+              ><small>추천도 78%</small></a
+            >
+          </li>
+          <li>
+            <a href="#idea-7"
+              ><span>7. 실패를 학습으로 바꾸는 루프</span
+              ><small>추천도 75%</small></a
+            >
+          </li>
+        </ul>
+
+        <article class="idea" id="idea-1">
+          <div class="idea-head">
+            <div class="rank">1</div>
+            <div class="idea-title">
+              <h3>
+                개인 자동화 프로필: <code>personal-github-linear-notion</code>
+              </h3>
+              <div class="metrics">
+                <span class="metric">축 · 개인 설정/건강검사</span
+                ><span class="metric green">추천도 · 88%</span
+                ><span class="metric amber">복잡도 · 중간</span>
+              </div>
+            </div>
+          </div>
+          <p>
+            <strong>한 줄 설명:</strong> “내 개인 개발 자동화 모드”를 하나의
+            이름 있는 프로필로 만든다.
+          </p>
+          <p>
+            지금은 GitHub 토큰, Linear API Key, Notion Parent Page, Docker 설정
+            같은 것들이 흩어져 있다. 이 아이디어는 그것들을
+            <code>personal-github-linear-notion</code>이라는 하나의 운영 모드로
+            묶자는 것이다. 이 프로필은 어떤 도구를 쓰는지, 어떤 권한이 필요한지,
+            PR 본문은 어떤 형식인지, Notion에는 어떤 기록을 남길지까지 설명한다.
+          </p>
+          <div class="diagram" aria-label="개인 자동화 프로필 그림">
+            <svg
+              viewBox="0 0 860 260"
+              role="img"
+              aria-labelledby="profile-title profile-desc"
+            >
+              <title id="profile-title">개인 자동화 프로필</title>
+              <desc id="profile-desc">
+                가운데 프로필이 Linear, GitHub, Notion, 건강검사, 실행 기록을
+                묶는다.
+              </desc>
+              <defs>
+                <marker
+                  id="arrow"
+                  markerWidth="10"
+                  markerHeight="10"
+                  refX="9"
+                  refY="3"
+                  orient="auto"
+                >
+                  <path d="M0,0 L10,3 L0,6 Z" fill="#63708a" />
+                </marker>
+              </defs>
+              <rect
+                x="300"
+                y="82"
+                width="260"
+                height="96"
+                rx="22"
+                fill="#eef2ff"
+                stroke="#3b5bfd"
+              />
+              <text
+                x="430"
+                y="118"
+                text-anchor="middle"
+                font-size="17"
+                font-weight="800"
+              >
+                개인 자동화 프로필
+              </text>
+              <text
+                x="430"
+                y="146"
+                text-anchor="middle"
+                font-size="13"
+                fill="#4b5a75"
+              >
+                한 번에 검증되는 설정 묶음
+              </text>
+              <rect
+                x="40"
+                y="38"
+                width="190"
+                height="58"
+                rx="16"
+                fill="#ffffff"
+                stroke="#d8deea"
+              />
+              <text
+                x="135"
+                y="73"
+                text-anchor="middle"
+                font-size="14"
+                font-weight="700"
+              >
+                Linear 명령
+              </text>
+              <rect
+                x="40"
+                y="164"
+                width="190"
+                height="58"
+                rx="16"
+                fill="#ffffff"
+                stroke="#d8deea"
+              />
+              <text
+                x="135"
+                y="199"
+                text-anchor="middle"
+                font-size="14"
+                font-weight="700"
+              >
+                GitHub PR
+              </text>
+              <rect
+                x="630"
+                y="38"
+                width="190"
+                height="58"
+                rx="16"
+                fill="#ffffff"
+                stroke="#d8deea"
+              />
+              <text
+                x="725"
+                y="73"
+                text-anchor="middle"
+                font-size="14"
+                font-weight="700"
+              >
+                Notion 위키
+              </text>
+              <rect
+                x="630"
+                y="164"
+                width="190"
+                height="58"
+                rx="16"
+                fill="#ffffff"
+                stroke="#d8deea"
+              />
+              <text
+                x="725"
+                y="199"
+                text-anchor="middle"
+                font-size="14"
+                font-weight="700"
+              >
+                실행 기록
+              </text>
+              <path
+                d="M230 67 C260 75 280 95 300 114"
+                fill="none"
+                stroke="#63708a"
+                stroke-width="2"
+                marker-end="url(#arrow)"
+              />
+              <path
+                d="M230 193 C260 185 280 165 300 146"
+                fill="none"
+                stroke="#63708a"
+                stroke-width="2"
+                marker-end="url(#arrow)"
+              />
+              <path
+                d="M560 114 C590 95 610 75 630 67"
+                fill="none"
+                stroke="#63708a"
+                stroke-width="2"
+                marker-end="url(#arrow)"
+              />
+              <path
+                d="M560 146 C590 165 610 185 630 193"
+                fill="none"
+                stroke="#63708a"
+                stroke-width="2"
+                marker-end="url(#arrow)"
+              />
+            </svg>
+            <p class="caption">
+              방향을 보여주는 그림이다. 구현 설계도는 아니다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>근거</strong>
+            <p class="basis">
+              현재 코드에는 이미 GitHub/Linear/Notion provider 설정이 있다.
+              하지만 사용자 경험은 아직 “하나의 개인 자동화 모드”로 묶여 있지
+              않다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>초보자용 비유</strong>
+            <p class="beginner">
+              게임에서 캐릭터 프리셋을 고르면 장비와 스킬이 한 번에 맞춰지는
+              것처럼, 개발 자동화도 “내 개인 GitHub+Linear+Notion 세팅”을 한
+              번에 고르고 검사할 수 있게 하자는 뜻이다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>단점</strong>
+            <p>
+              처음에는 GitHub+Linear+Notion 조합을 강하게 밀게 된다. 다른
+              provider도 계속 지원하려면 추상화와 golden path 사이의 균형이
+              필요하다.
+            </p>
+          </div>
+        </article>
+
+        <article class="idea" id="idea-2">
+          <div class="idea-head">
+            <div class="rank">2</div>
+            <div class="idea-title">
+              <h3>Linear 이슈를 실행 지시서로 만들기</h3>
+              <div class="metrics">
+                <span class="metric">축 · Linear 명령판</span
+                ><span class="metric green">추천도 · 86%</span
+                ><span class="metric amber">복잡도 · 중간</span>
+              </div>
+            </div>
+          </div>
+          <p>
+            <strong>한 줄 설명:</strong> Linear 이슈 하나만 잘 쓰면 ReplaceMe가
+            바로 작업할 수 있게 만든다.
+          </p>
+          <p>
+            지금은 API에 <code>repoUrl</code>, <code>baseBranch</code>, 설명
+            등을 넣어 티켓을 만든다. 앞으로는 Linear 이슈 자체가 작업 지시서가
+            된다. ReplaceMe는 이슈를 읽고 “이대로 실행해도 안전한가?”를 먼저
+            확인한다. 정보가 부족하면 바로 실행하지 않고 Linear에 질문 댓글을
+            남긴다.
+          </p>
+          <div class="diagram" aria-label="Linear 실행 가능 여부 검사 그림">
+            <svg
+              viewBox="0 0 860 230"
+              role="img"
+              aria-labelledby="linear-title linear-desc"
+            >
+              <title id="linear-title">Linear 이슈 실행 가능 여부 검사</title>
+              <desc id="linear-desc">
+                이슈가 충분하면 실행하고, 부족하면 Linear에 질문을 남긴다.
+              </desc>
+              <defs>
+                <marker
+                  id="arrow2"
+                  markerWidth="10"
+                  markerHeight="10"
+                  refX="9"
+                  refY="3"
+                  orient="auto"
+                >
+                  <path d="M0,0 L10,3 L0,6 Z" fill="#63708a" />
+                </marker>
+              </defs>
+              <rect
+                x="40"
+                y="78"
+                width="160"
+                height="70"
+                rx="18"
+                fill="#ffffff"
+                stroke="#d8deea"
+              />
+              <text
+                x="120"
+                y="108"
+                text-anchor="middle"
+                font-size="15"
+                font-weight="800"
+              >
+                Linear 이슈
+              </text>
+              <text
+                x="120"
+                y="132"
+                text-anchor="middle"
+                font-size="12"
+                fill="#5f6b7c"
+              >
+                요구사항 + 댓글
+              </text>
+              <path
+                d="M200 113 L300 113"
+                stroke="#63708a"
+                stroke-width="2"
+                marker-end="url(#arrow2)"
+              />
+              <polygon
+                points="390,50 480,113 390,176 300,113"
+                fill="#eef2ff"
+                stroke="#3b5bfd"
+              />
+              <text
+                x="390"
+                y="106"
+                text-anchor="middle"
+                font-size="14"
+                font-weight="800"
+              >
+                실행 가능?
+              </text>
+              <text
+                x="390"
+                y="128"
+                text-anchor="middle"
+                font-size="12"
+                fill="#5f6b7c"
+              >
+                범위 · 테스트 · 저장소
+              </text>
+              <path
+                d="M480 113 L610 80"
+                stroke="#63708a"
+                stroke-width="2"
+                marker-end="url(#arrow2)"
+              />
+              <text x="540" y="82" font-size="12" fill="#047857">예</text>
+              <rect
+                x="610"
+                y="44"
+                width="190"
+                height="58"
+                rx="16"
+                fill="#ecfdf5"
+                stroke="#8ad6b5"
+              />
+              <text
+                x="705"
+                y="78"
+                text-anchor="middle"
+                font-size="14"
+                font-weight="800"
+              >
+                에이전트 실행
+              </text>
+              <path
+                d="M480 113 L610 154"
+                stroke="#63708a"
+                stroke-width="2"
+                marker-end="url(#arrow2)"
+              />
+              <text x="540" y="152" font-size="12" fill="#b45309">아니오</text>
+              <rect
+                x="610"
+                y="128"
+                width="190"
+                height="58"
+                rx="16"
+                fill="#fffbeb"
+                stroke="#f3c86b"
+              />
+              <text
+                x="705"
+                y="154"
+                text-anchor="middle"
+                font-size="14"
+                font-weight="800"
+              >
+                Linear에 질문
+              </text>
+              <text
+                x="705"
+                y="174"
+                text-anchor="middle"
+                font-size="12"
+                fill="#7c4a03"
+              >
+                정보를 채운 뒤 실행
+              </text>
+            </svg>
+            <p class="caption">
+              방향을 보여주는 그림이다. 실제 UI/명령어 설계는 다음 단계에서
+              정한다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>근거</strong>
+            <p class="basis">
+              현재 코드는 API 티켓을 만들면 바로 큐에 넣는 구조다. Linear 연동은
+              이슈 생성과 댓글은 가능하지만, 아직 “이슈 자체가 실행 명령”인
+              구조는 아니다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>왜 중요한가</strong>
+            <p>
+              애매한 이슈를 바로 실행하면 에이전트가 잘못된 코드를 만들 가능성이
+              높다. 실행 전 질문을 통해 실패 비용을 줄일 수 있다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>단점</strong>
+            <p>
+              어떤 이슈가 “충분히 실행 가능하다”고 볼지 기준을 정해야 한다.
+              기준이 너무 빡빡하면 사용하기 귀찮아질 수 있다.
+            </p>
+          </div>
+        </article>
+
+        <article class="idea" id="idea-3">
+          <div class="idea-head">
+            <div class="rank">3</div>
+            <div class="idea-title">
+              <h3>Run Passport: 실행 기록의 신분증 만들기</h3>
+              <div class="metrics">
+                <span class="metric">축 · 실행 기록과 안전성</span
+                ><span class="metric green">추천도 · 84%</span
+                ><span class="metric amber">복잡도 · 중간</span>
+              </div>
+            </div>
+          </div>
+          <p>
+            <strong>한 줄 설명:</strong> 자동화 한 번이 실행될 때마다 “무슨 일이
+            있었는지”를 증명하는 기록 카드를 만든다.
+          </p>
+          <p>
+            Run Passport에는 Linear 이슈, GitHub 브랜치/PR, Notion 문서, 실행한
+            컨테이너, 사용한 설정, 승인 기록, 로그 요약, 테스트 결과, 실패
+            이유가 들어간다. Linear 댓글, GitHub PR 본문, Notion 문서는 모두 이
+            Passport를 가리킨다.
+          </p>
+          <div class="field">
+            <strong>근거</strong>
+            <p class="basis">
+              현재 코드에는 Ticket, ExecutionLog, ApprovalRequest가 있어 실행
+              기록의 재료는 이미 있다. 하지만 이것을 하나의 신뢰 가능한 “실행
+              영수증”으로 묶는 개념은 아직 없다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>초보자용 비유</strong>
+            <p class="beginner">
+              택배 송장 번호처럼 생각하면 된다. 송장 번호 하나로 어디서
+              출발했고, 어디까지 왔고, 문제가 생겼는지 확인할 수 있다. Run
+              Passport는 자동화 작업의 송장 번호다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>단점</strong>
+            <p>
+              로그와 설정 정보를 너무 많이 저장하면 보안 문제가 생길 수 있다.
+              비밀값과 개인 경로는 반드시 가려야 한다.
+            </p>
+          </div>
+        </article>
+
+        <article class="idea" id="idea-4">
+          <div class="idea-head">
+            <div class="rank">4</div>
+            <div class="idea-title">
+              <h3>PR 리뷰 패킷 만들기</h3>
+              <div class="metrics">
+                <span class="metric">축 · GitHub PR 리뷰 흐름</span
+                ><span class="metric green">추천도 · 82%</span
+                ><span class="metric amber">복잡도 · 중간</span>
+              </div>
+            </div>
+          </div>
+          <p>
+            <strong>한 줄 설명:</strong> 에이전트가 PR을 만들 때, 리뷰어가 바로
+            이해할 수 있는 설명 패키지를 자동으로 작성한다.
+          </p>
+          <p>
+            지금 GitHub PR 본문은 거의 고정 문장에 가깝다. 앞으로는 PR 본문에
+            문제, 변경 사항, 테스트, 데모, Linear 이슈 링크, Notion 문서 링크,
+            Run Passport, 남은 위험을 자동으로 넣는다. 이 워크스페이스의 PR 작성
+            규칙처럼 한국어 4섹션 구조를 기본으로 사용한다.
+          </p>
+          <div class="field">
+            <strong>근거</strong>
+            <p class="basis">
+              현재 GitHub PR 생성 코드는
+              <code>Automated implementation for ticket...</code> 같은 고정
+              본문을 사용한다. 반면 이 워크스페이스 규칙은 PR/MR 본문을
+              문제·변경·테스트·데모 구조로 쓰라고 한다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>왜 중요한가</strong>
+            <p>
+              자동화가 만든 PR은 사람이 리뷰해야 한다. PR 본문이 부실하면
+              자동화가 시간을 아끼기보다 리뷰 시간을 늘린다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>단점</strong>
+            <p>
+              테스트를 실제로 돌리지 않았는데 돌린 것처럼 쓰면 안 된다. 증거가
+              없으면 “미실행”이라고 솔직히 써야 한다.
+            </p>
+          </div>
+        </article>
+
+        <article class="idea" id="idea-5">
+          <div class="idea-head">
+            <div class="rank">5</div>
+            <div class="idea-title">
+              <h3>살아있는 Notion 작업 문서</h3>
+              <div class="metrics">
+                <span class="metric">축 · Notion 기억 저장소</span
+                ><span class="metric green">추천도 · 80%</span
+                ><span class="metric amber">복잡도 · 중간</span>
+              </div>
+            </div>
+          </div>
+          <p>
+            <strong>한 줄 설명:</strong> Notion에 “작업 시작부터 끝까지”
+            업데이트되는 문서를 만든다.
+          </p>
+          <p>
+            현재 Notion 문서는 별도 endpoint를 호출해야 만들 수 있고, 내용도
+            상태/저장소/브랜치/PR 정도의 정적 정보에 가깝다. 앞으로는 작업이
+            시작되면 Notion 페이지가 생기고, 승인 대기, PR 생성, 실패, 완료,
+            배운 점까지 계속 업데이트된다. 중요한 실패나 반복되는 패턴은 나중에
+            다시 참고할 수 있는 위키 조각으로 남긴다.
+          </p>
+          <div class="field">
+            <strong>근거</strong>
+            <p class="basis">
+              현재 Notion 연동은 간단한 페이지 생성만 지원하고, Ticket 자체에는
+              Notion 문서 URL을 계속 추적하거나 업데이트하는 구조가 없다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>왜 중요한가</strong>
+            <p>
+              Notion을 쓰는 이유는 기억을 남기기 위해서다. 단순히 티켓 내용을
+              복사하는 페이지보다, “왜 이 작업을 했고 무엇을 배웠는지”가 남는
+              문서가 더 가치 있다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>단점</strong>
+            <p>
+              모든 실행을 전부 Notion에 남기면 위키가 지저분해질 수 있다. 어떤
+              작업을 위키로 승격할지 기준이 필요하다.
+            </p>
+          </div>
+        </article>
+
+        <article class="idea" id="idea-6">
+          <div class="idea-head">
+            <div class="rank">6</div>
+            <div class="idea-title">
+              <h3>Provider Doctor + 로컬 안전문</h3>
+              <div class="metrics">
+                <span class="metric">축 · 개인 설정/건강검사</span
+                ><span class="metric green">추천도 · 78%</span
+                ><span class="metric amber">복잡도 · 중간</span>
+              </div>
+            </div>
+          </div>
+          <p>
+            <strong>한 줄 설명:</strong> 작업 시작 전에
+            GitHub/Linear/Notion/Docker 준비 상태를 먼저 검사한다.
+          </p>
+          <p>
+            Provider Doctor는 GitHub 토큰 권한, <code>gh</code> CLI 사용 가능
+            여부, Linear 팀 접근 권한, Notion 페이지 쓰기 권한, Docker 연결,
+            DB/Kafka 상태, 비밀값 redaction을 확인한다. 로컬 안전문은 “이 API가
+            외부에 열려도 안전한가?”를 검사한다. 기본은 로컬 개발용으로 안전하게
+            닫아두는 것이다.
+          </p>
+          <div class="field">
+            <strong>근거</strong>
+            <p class="basis">
+              현재 <code>/health</code>는 DB, Kafka, Docker 정도를 확인한다.
+              GitHub/Linear/Notion 권한은 실제 사용 중에야 실패할 가능성이 크다.
+              문서에도 API 인증/인가와 Docker socket 운영 hardening이 아직
+              한계로 적혀 있다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>초보자용 비유</strong>
+            <p class="beginner">
+              배포 전에 “환경변수 다 넣었나? DB 연결되나?” 확인하는 것처럼,
+              에이전트가 코드를 만지기 전에 외부 도구 권한을 미리 점검하는
+              안전장치다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>단점</strong>
+            <p>
+              외부 서비스 API와 권한 모델이 바뀌면 Doctor도 업데이트해야 한다.
+              검사 실패 메시지를 친절하게 만드는 것이 중요하다.
+            </p>
+          </div>
+        </article>
+
+        <article class="idea" id="idea-7">
+          <div class="idea-head">
+            <div class="rank">7</div>
+            <div class="idea-title">
+              <h3>실패를 학습으로 바꾸는 루프</h3>
+              <div class="metrics">
+                <span class="metric">축 · 실행 기록과 안전성</span
+                ><span class="metric green">추천도 · 75%</span
+                ><span class="metric amber">복잡도 · 중간</span>
+              </div>
+            </div>
+          </div>
+          <p>
+            <strong>한 줄 설명:</strong> 실패한 자동화 실행을 그냥 버리지 않고,
+            재시도와 학습 자료로 만든다.
+          </p>
+          <p>
+            작업이 실패하면 ReplaceMe는 “어디서 실패했는지, 다시 실행해도
+            되는지, 어떤 정보를 추가해야 하는지”를 보여준다. 필요하면 Linear에
+            후속 이슈를 만들고, Notion에는 실패 요약을 남긴다. 다음에 비슷한
+            이슈가 들어오면 예전 실패 기록을 참고해 경고할 수 있다.
+          </p>
+          <div class="field">
+            <strong>근거</strong>
+            <p class="basis">
+              현재 실행 로그와 실패 상태는 저장되지만, 재실행 API, Kafka DLQ,
+              체계적인 retry 정책은 아직 없다. 실패 기록을 Notion 기억과 Run
+              Passport로 연결하면 학습 자산이 된다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>왜 중요한가</strong>
+            <p>
+              개인 자동화는 처음부터 완벽하지 않다. 실패를 잘 남기고 안전하게
+              다시 시도할 수 있어야 점점 믿을 수 있는 도구가 된다.
+            </p>
+          </div>
+          <div class="field">
+            <strong>단점</strong>
+            <p>
+              자동 재시도는 위험할 수 있다. 처음에는 사용자가 명시적으로
+              선택하는 “보이는 재시도”가 더 안전하다.
+            </p>
+          </div>
+        </article>
+      </section>
+
+      <section id="rejection-summary">
+        <h2>이번에 제외하거나 합친 아이디어</h2>
+        <p>
+          전체 후보를 검토한 결과, 근거가 약하거나 더 큰 아이디어 안에 들어가는
+          것들은 따로 남기지 않았다.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>아이디어</th>
+              <th>처리 이유</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>Agent-ready gate 단독 아이디어</td>
+              <td>2번 Linear 실행 지시서 아이디어 안에 합쳤다.</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>Linear-native approval lane</td>
+              <td>
+                현재 approval 구조는 Slack 중심이라 단독 아이디어로는 근거가
+                약하다. 나중에 Linear 명령판 안에서 다루면 좋다.
+              </td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td>PR 생성 복구 상태머신</td>
+              <td>4번 PR 리뷰 패킷과 6번 Provider Doctor 안에 합쳤다.</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td>GitHub 리뷰 댓글 기반 재실행</td>
+              <td>
+                흥미롭지만 현재 코드에는 GitHub 리뷰/체크 수집 경로가 없다. PR
+                패킷 이후 다음 단계 후보로 보류한다.
+              </td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td>Notion 실패 캡슐 단독 아이디어</td>
+              <td>5번 Notion 작업 문서와 7번 실패 학습 루프 안에 합쳤다.</td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td>시도별 ledger 단독 아이디어</td>
+              <td>3번 Run Passport가 더 이해하기 쉬운 이름과 구조다.</td>
+            </tr>
+            <tr>
+              <td>7</td>
+              <td>도구별 backlink graph 전략</td>
+              <td>
+                3번 Run Passport와 5번 Notion 문서의 일부로 다루면 충분하다.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout" style="margin-top: 16px">
+          <strong>빠진 축 없음:</strong> Linear, GitHub, Notion, 실행 안전성,
+          개인 설정/건강검사 축이 모두 7개 아이디어 안에 들어 있다.
+        </div>
+      </section>
+
+      <section id="recommended-next-step">
+        <h2>추천 다음 단계</h2>
+        <div class="callout">
+          <p>
+            <strong>내 추천:</strong> 1번
+            <code>personal-github-linear-notion</code>을 먼저
+            <code>ce-brainstorm</code>으로 구체화하자. 이유는 이 아이디어가
+            나머지 아이디어들을 담는 “첫 제품 모드”가 될 수 있기 때문이다.
+          </p>
+          <p>
+            그다음 2번 Linear 실행 지시서, 3번 Run Passport, 4번 PR 리뷰 패킷을
+            첫 번째 구현 후보로 좁히면 자연스럽다.
+          </p>
+        </div>
+      </section>
+
+      <footer class="composition-signal">
+        Composed 2026-07-08T02:05Z by ce-ideate from the ReplaceMe repo and user
+        prompt: “Notion as wiki, Linear as issue tracker, personal
+        GitHub/Notion/Linear development automation.” Rewritten in Korean for
+        beginner-friendly reading.
+      </footer>
+    </main>
+  </body>
+</html>

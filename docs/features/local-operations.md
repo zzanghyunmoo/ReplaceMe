@@ -6,6 +6,16 @@ ReplaceMe는 Docker Compose로 API, PostgreSQL, Kafka, agent image를 함께 실
 수 있게 구성되어 있습니다. `/health` endpoint로 PostgreSQL, Kafka, Docker daemon
 연결 상태를 확인합니다.
 
+## 한눈에 보기
+
+| 항목 | 내용 |
+| --- | --- |
+| 시작 조건 | `.env`를 준비하고 Docker Compose를 실행합니다. |
+| 핵심 책임 | 로컬 API, DB, Kafka, agent image를 함께 띄웁니다. |
+| 주요 확인 | `/health`, compose container 상태, test 명령입니다. |
+| 실패 시 | DB/Kafka/Docker 연결 문제를 먼저 확인합니다. |
+| ZZA-51 이후 | `/health`와 별도로 profile readiness endpoint가 추가될 예정입니다. |
+
 ## 실행 구성
 
 ```mermaid
@@ -78,6 +88,28 @@ flowchart TD
 
 모두 정상이면 `200 OK`, 하나라도 실패하면 `Problem` 응답을 반환합니다.
 
+`/health`는 서비스 dependency 확인용입니다. GitHub, Linear, Notion 권한까지
+확인하는 기능은 `personal-github-linear-notion` readiness profile endpoint에서 따로
+확인합니다.
+
+## Readiness profile 확인
+
+`personal-github-linear-notion` profile은 agent run 전에 GitHub, Linear, Notion,
+Docker, Kafka, PostgreSQL, agent image, secret redaction 준비 상태를 확인합니다.
+
+```bash
+# 조회 전용: Linear/Notion에 쓰지 않음
+curl http://localhost:8080/api/readiness/profiles/personal-github-linear-notion
+
+# 수동 doctor: 설정된 경우 Linear/Notion에 readiness report를 남김
+curl -X POST http://localhost:8080/api/readiness/profiles/personal-github-linear-notion/doctor
+```
+
+`DEVAUTOMATION_ProfileReadiness__SelectedProfile=personal-github-linear-notion`을
+설정하면 `/api/tickets`와 `AgentJob.RunAsync` 앞에서 pre-run gate가 동작합니다.
+required check가 실패하면 ticket 생성은 `409 ProblemDetails`로 막히고, 이미 queued
+된 ticket은 `Failed` 상태와 `Readiness gate blocked:` 사유를 남깁니다.
+
 ## 개발 검증 명령
 
 ```bash
@@ -85,6 +117,13 @@ dotnet restore DevAutomation.sln
 dotnet build DevAutomation.sln
 dotnet test DevAutomation.sln
 ```
+
+기대 결과:
+
+1. restore가 NuGet package를 정상 복원합니다.
+2. build가 compile error 없이 끝납니다.
+3. test가 domain/service/infrastructure test를 통과합니다.
+4. `/health`는 DB/Kafka/Docker가 준비된 로컬 환경에서 `200 OK`를 반환합니다.
 
 로컬 머신에 .NET 8 runtime이 없다면 Docker SDK 이미지로 테스트할 수 있습니다.
 

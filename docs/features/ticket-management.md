@@ -6,16 +6,30 @@
 즉시 Kafka topic에 에이전트 실행 메시지를 발행합니다. 이후 API로 티켓 상태,
 목록, 로그를 확인하거나 실행 중인 티켓을 취소할 수 있습니다.
 
+## 한눈에 보기
+
+<!-- markdownlint-disable MD013 -->
+| 항목 | 내용 |
+| --- | --- |
+| 시작 조건 | 사용자가 `POST /api/tickets`로 개발 요청을 보냅니다. |
+| 핵심 책임 | 티켓 저장, 상태 조회, 취소, 로그 조회, agent job enqueue입니다. |
+| 주요 출력 | `TicketResponse`, Kafka job message, 실행 로그입니다. |
+| 실패 시 | agent 실행 단계에서 `Failed`로 기록합니다. |
+| readiness gate | `personal-github-linear-notion`이 선택되면 required failure를 enqueue 전에 차단합니다. |
+<!-- markdownlint-enable MD013 -->
+
 ## 구현된 엔드포인트
 
+<!-- markdownlint-disable MD013 -->
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
-| `POST` | `/api/tickets` | 티켓 생성 + Kafka agent job enqueue |
+| `POST` | `/api/tickets` | 티켓 생성 + readiness gate 통과 시 Kafka agent job enqueue |
 | `GET` | `/api/tickets/{id}` | 단일 티켓 상태 조회 |
 | `GET` | `/api/tickets` | 상태 필터와 페이징을 지원하는 목록 조회 |
 | `POST` | `/api/tickets/{id}/cancel` | 티켓 취소 + 연결된 컨테이너 중지 시도 |
 | `GET` | `/api/tickets/{id}/logs` | 티켓별 실행 로그 조회 |
 | `POST` | `/api/tickets/{id}/documents` | active document tool에 티켓 문서 생성 |
+<!-- markdownlint-enable MD013 -->
 
 ## 요청/응답 모델
 
@@ -91,6 +105,21 @@ curl http://localhost:8080/api/tickets
 curl http://localhost:8080/api/tickets/{ticket-id}
 curl http://localhost:8080/api/tickets/{ticket-id}/logs
 ```
+
+기대 결과:
+
+1. `POST /api/tickets`는 새 티켓 ID와 `Pending` 상태를 반환합니다.
+2. Kafka worker가 message를 consume하면 상태가 `Running`으로 바뀝니다.
+3. agent 실행이 끝나면 `Completed` 또는 `Failed`가 됩니다.
+4. `GET /api/tickets/{ticket-id}/logs`에서 agent log를 확인할 수 있습니다.
+5. readiness required failure가 있으면 `POST /api/tickets`는 `409 ProblemDetails`를
+   반환하고 ticket과 Kafka message를 만들지 않습니다.
+
+실패하면 먼저 볼 곳:
+
+- `FailReason` 필드
+- `GET /api/tickets/{ticket-id}/logs`
+- API/worker 로그 `logs/devautomation-.log`
 
 ## 현재 한계
 

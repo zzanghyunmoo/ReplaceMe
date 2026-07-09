@@ -7,6 +7,18 @@
 티켓 상태를 `Running`으로 바꾼 뒤 Docker 컨테이너 하나를 생성합니다. 컨테이너
 안에서는 설정된 코딩 에이전트 provider가 작업을 수행합니다.
 
+## 한눈에 보기
+
+<!-- markdownlint-disable MD013 -->
+| 항목 | 내용 |
+| --- | --- |
+| 시작 조건 | Kafka topic에 agent job message가 들어옵니다. |
+| 핵심 책임 | 티켓 하나를 격리된 Docker agent 실행으로 바꿉니다. |
+| 주요 출력 | 실행 로그, 티켓 상태 변경, PR/MR URL입니다. |
+| 실패 시 | 티켓을 `Failed`로 바꾸고 실패 사유를 저장합니다. |
+| 같이 봐야 할 문서 | `ticket-management.md`, `approval-flow.md`, `persistence-observability.md` |
+<!-- markdownlint-enable MD013 -->
+
 ## 실행 흐름
 
 ```mermaid
@@ -62,8 +74,10 @@ flowchart TD
 - 각 줄은 `ClaudeStreamParser`를 거쳐 `AgentLogEvent`로 변환됩니다.
 - JSON line이면 `type` 필드를 event type으로 사용합니다.
 - plain text면 `stdout` event로 저장합니다.
-- `SecretRedactor`가 Anthropic, GitHub, GitLab, Slack 관련 secret 값을
-  `[REDACTED]`로 치환합니다.
+- `SecretRedactor`가 Anthropic, GitHub, GitLab, Slack, Jira, Linear 관련 secret
+  값을 `[REDACTED]`로 치환합니다.
+- Notion 등 추가 provider secret은 ZZA-51 readiness profile에서 redaction gap으로
+  점검할 예정입니다.
 - `AgentJob`은 로그를 25개씩 buffer 후 DB에 저장합니다.
 
 ## 코드 위치
@@ -85,6 +99,22 @@ docker compose --profile build-only build agent-image
 # API + DB + Kafka 실행
 docker compose up --build api postgres kafka
 ```
+
+기대 결과:
+
+1. `agent-image` build가 성공합니다.
+2. API, PostgreSQL, Kafka container가 실행됩니다.
+3. 티켓을 생성하면 Kafka message가 발행되고 worker가 `AgentJob.RunAsync`를
+   실행합니다.
+4. 성공 시 티켓은 `Completed`가 되고 PR/MR URL이 저장됩니다.
+5. 실패 시 티켓은 `Failed`가 되고 `FailReason`과 execution log를 확인할 수
+   있습니다.
+
+실패하면 먼저 볼 곳:
+
+- API 로그: `logs/devautomation-.log`
+- 티켓 로그: `GET /api/tickets/{ticket-id}/logs`
+- Docker 상태: `docker ps -a`, `docker logs <container-id>`
 
 ## 현재 한계
 
