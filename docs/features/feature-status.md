@@ -39,7 +39,7 @@ flowchart LR
 | 승인 MCP | 민감 작업 전 사용자의 승인/거절 결정을 받아 agent에 반환합니다. | Claude Code permission prompt | `allow` 또는 `deny` JSON | [`approval-flow.md`](./approval-flow.md) |
 | Slack 연동 | 티켓 상태 알림과 승인 버튼 메시지를 처리합니다. | ticket status, approval request, Slack webhook | Slack message/update | [`slack-integration.md`](./slack-integration.md) |
 | 저장소/관측성 | 티켓, 승인 요청, 실행 로그, telemetry를 저장/노출합니다. | EF Core entities, Docker logs | PostgreSQL rows, Serilog, OTLP | [`persistence-observability.md`](./persistence-observability.md) |
-| 로컬 운영 | Docker Compose로 API/DB/Kafka/agent image를 실행하고 health를 확인합니다. | `.env`, compose services | running API, `/health` result | [`local-operations.md`](./local-operations.md) |
+| 로컬 운영 | Docker Compose로 API/DB/Kafka-compatible broker/agent image를 실행하고 health를 확인합니다. | `.env`, compose services | running API, `/health` result | [`local-operations.md`](./local-operations.md) |
 | 외부 Provider | GitHub/GitLab, Linear/Jira, Notion/Confluence 같은 외부 도구를 교체 가능하게 묶습니다. | provider options, tokens | issue/document/PR integration | Notion: 외부 Provider 연동 개요 |
 | ZZA-51 readiness profile | GitHub/Linear/Notion 개인 자동화 환경이 실행 가능한지 사전 점검합니다. | profile config, provider credentials | readiness report, pre-run gate result | [`readiness-profile.md`](./readiness-profile.md) |
 | Run Passport v0 | 티켓에서 실행 요약 계약을 파생해 후속 Notion/PR surface가 같은 필드명을 쓰게 합니다. | ticket id | `RunPassportSummaryResponse` | [`run-passport.md`](./run-passport.md) |
@@ -93,7 +93,7 @@ flowchart TD
 | 용어 | 쉬운 설명 |
 | --- | --- |
 | Ticket | 자동화가 처리할 개발 요청 단위입니다. |
-| Kafka | 티켓 실행 작업을 worker에게 전달하는 줄입니다. |
+| Kafka API broker | 티켓 실행 작업을 worker에게 전달하는 줄입니다. 로컬 Compose에서는 Redpanda가 이 역할을 합니다. |
 | AgentJob | 티켓 하나를 실제 agent 실행으로 바꾸는 작업 단위입니다. |
 | DockerAgentRunner | 격리된 Docker 컨테이너 안에서 코딩 에이전트를 실행하는 구성요소입니다. |
 | Approval MCP | 코딩 에이전트가 민감 작업 전에 사용자 승인을 물어보는 통로입니다. |

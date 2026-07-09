@@ -165,11 +165,9 @@ DEVAUTOMATION_ProfileReadiness__SelectedProfile=personal-github-linear-notion
 export READY_BLOCK_TITLE="QA readiness gate should block"
 
 kafka_offset() {
-  docker compose exec -T kafka kafka-run-class.sh kafka.tools.GetOffsetShell \
-    --bootstrap-server kafka:9092 \
-    --topic devautomation.agent-jobs \
-    --time -1 2>/dev/null \
-    | awk -F: '{sum += $3} END {print sum + 0}'
+  docker compose exec -T kafka rpk topic describe devautomation.agent-jobs \
+    --print-partitions -X brokers=kafka:9092 2>/dev/null \
+    | awk 'NR > 1 && $1 ~ /^[0-9]+$/ {sum += $6} END {print sum + 0}'
 }
 
 export READY_BEFORE_COUNT=$(docker compose exec -T postgres psql -U devautomation -d devautomation -tAc \

@@ -1,10 +1,14 @@
 using System;
+using DevAutomation.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace DevAutomation.Infrastructure.Migrations;
 
+[DbContext(typeof(DevAutomationDbContext))]
+[Migration("20260707000000_InitialCreate")]
 public partial class InitialCreate : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
