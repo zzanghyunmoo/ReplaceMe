@@ -25,6 +25,7 @@
 | --- | --- | --- |
 | `POST` | `/api/tickets` | 티켓 생성 + readiness gate 통과 시 Kafka agent job enqueue |
 | `GET` | `/api/tickets/{id}` | 단일 티켓 상태 조회 |
+| `GET` | `/api/tickets/{id}/run-passport` | 티켓에서 파생한 Run Passport v0 summary 조회 |
 | `GET` | `/api/tickets` | 상태 필터와 페이징을 지원하는 목록 조회 |
 | `POST` | `/api/tickets/{id}/cancel` | 티켓 취소 + 연결된 컨테이너 중지 시도 |
 | `GET` | `/api/tickets/{id}/logs` | 티켓별 실행 로그 조회 |
@@ -49,7 +50,9 @@
 ```
 
 응답은 `TicketResponse` 형태로 티켓의 현재 상태, PR/MR URL, 실패 사유,
-외부 이슈 tracker reference를 반환합니다.
+외부 이슈 tracker reference를 반환합니다. `GET /api/tickets/{id}/run-passport`는
+같은 티켓에서 `RunPassportSummaryResponse`를 파생해 후속 Notion/PR surface가
+공유할 v0 summary contract를 반환합니다.
 
 `createExternalIssue`가 `true`이거나 기존 이슈 reference를 붙이는 경우
 `IssueTracker:Provider`는 `Jira` 또는 `Linear`여야 합니다.
@@ -103,6 +106,7 @@ curl -X POST http://localhost:8080/api/tickets \
 
 curl http://localhost:8080/api/tickets
 curl http://localhost:8080/api/tickets/{ticket-id}
+curl http://localhost:8080/api/tickets/{ticket-id}/run-passport
 curl http://localhost:8080/api/tickets/{ticket-id}/logs
 ```
 
@@ -111,8 +115,9 @@ curl http://localhost:8080/api/tickets/{ticket-id}/logs
 1. `POST /api/tickets`는 새 티켓 ID와 `Pending` 상태를 반환합니다.
 2. Kafka worker가 message를 consume하면 상태가 `Running`으로 바뀝니다.
 3. agent 실행이 끝나면 `Completed` 또는 `Failed`가 됩니다.
-4. `GET /api/tickets/{ticket-id}/logs`에서 agent log를 확인할 수 있습니다.
-5. readiness required failure가 있으면 `POST /api/tickets`는 `409 ProblemDetails`를
+4. `GET /api/tickets/{ticket-id}/run-passport`에서 실행 요약 계약을 확인할 수 있습니다.
+5. `GET /api/tickets/{ticket-id}/logs`에서 agent log를 확인할 수 있습니다.
+6. readiness required failure가 있으면 `POST /api/tickets`는 `409 ProblemDetails`를
    반환하고 ticket과 Kafka message를 만들지 않습니다.
 
 실패하면 먼저 볼 곳:

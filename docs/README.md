@@ -36,6 +36,8 @@
   설정, 헬스체크
 - [`features/readiness-profile.md`](./features/readiness-profile.md) — ZZA-51
   `personal-github-linear-notion` readiness profile
+- [`features/run-passport.md`](./features/run-passport.md) — Run Passport v0
+  summary contract
 - [`qa/README.md`](./qa/README.md) — 로컬 실행부터 기능별 실 테스트를 진행하는
   QA 문서 목차
 - [`plans/2026-07-08-001-feat-personal-github-linear-notion-profile-plan.md`](./plans/2026-07-08-001-feat-personal-github-linear-notion-profile-plan.md) —
@@ -47,8 +49,8 @@
 ## 현재 구현 범위
 
 ReplaceMe는 지금 “요구사항 티켓 → Kafka 큐 → 격리 컨테이너에서 코딩 에이전트
-실행 → 필요 시 notifier 승인 → 로그/상태 저장”의 핵심 수직 흐름을 갖춘
-상태입니다.
+실행 → 필요 시 notifier 승인 → 로그/상태 저장 → Run Passport v0 요약 조회”의
+핵심 수직 흐름을 갖춘 상태입니다.
 
 아직 웹 UI, API 인증, 재시도 정책, 운영 배포 설정은 v1 범위 밖입니다.
 

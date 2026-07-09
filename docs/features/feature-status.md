@@ -42,6 +42,7 @@ flowchart LR
 | 로컬 운영 | Docker Compose로 API/DB/Kafka/agent image를 실행하고 health를 확인합니다. | `.env`, compose services | running API, `/health` result | [`local-operations.md`](./local-operations.md) |
 | 외부 Provider | GitHub/GitLab, Linear/Jira, Notion/Confluence 같은 외부 도구를 교체 가능하게 묶습니다. | provider options, tokens | issue/document/PR integration | Notion: 외부 Provider 연동 개요 |
 | ZZA-51 readiness profile | GitHub/Linear/Notion 개인 자동화 환경이 실행 가능한지 사전 점검합니다. | profile config, provider credentials | readiness report, pre-run gate result | [`readiness-profile.md`](./readiness-profile.md) |
+| Run Passport v0 | 티켓에서 실행 요약 계약을 파생해 후속 Notion/PR surface가 같은 필드명을 쓰게 합니다. | ticket id | `RunPassportSummaryResponse` | [`run-passport.md`](./run-passport.md) |
 <!-- markdownlint-enable MD013 -->
 
 ## 기능 간 의존 관계
@@ -61,13 +62,16 @@ flowchart TD
     Readiness -.provider 준비 확인.-> Repo
     Readiness -.report publish.-> IssueProvider
     Readiness -.setup page update.-> DocProvider
+    Ticket --> Passport[Run Passport v0]
+    Passport -.future consumer.-> DocProvider
+    Passport -.future consumer.-> Repo
 ```
 
 ## 현재 구현된 것과 아직 아닌 것
 
 | 구분 | 구현됨 | 아직 아님 |
 | --- | --- | --- |
-| 실행 흐름 | 티켓 생성, Kafka enqueue, Docker agent 실행, PR/MR 생성 | 실패 재시도, DLQ, run replay |
+| 실행 흐름 | 티켓 생성, Kafka enqueue, Docker agent 실행, PR/MR 생성, Run Passport v0 summary | 실패 재시도, DLQ, run replay, full Run Passport persistence |
 | 승인 | Approval MCP, Slack 버튼 승인/거절, 수동 승인 API | 승인 입력 수정 UI, 거절 사유 modal |
 | 외부 연동 | GitHub/GitLab, Jira/Linear, Notion/Confluence provider 골격, readiness doctor | full end-to-end Linear execution grammar |
 | 운영 | `/health`, readiness profile endpoint, Docker Compose, 로그/telemetry | production manifest, 인증/인가, 운영 hardening |
