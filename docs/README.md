@@ -56,7 +56,7 @@ ReplaceMe는 지금 “요구사항 티켓 → Kafka 큐 → 격리 컨테이너
 
 | 용어 | 쉬운 설명 |
 | --- | --- |
-| Kafka | 티켓 실행 작업을 worker에게 전달하는 메시지 큐입니다. |
+| Kafka API broker | 티켓 실행 작업을 worker에게 전달하는 메시지 큐입니다. 로컬 Compose에서는 Redpanda가 이 역할을 합니다. |
 | MCP | 코딩 에이전트가 외부 도구를 안전하게 호출하게 해주는 연결 규격입니다. |
 | Provider | GitHub/GitLab, Linear/Jira처럼 교체 가능한 외부 도구 구현입니다. |
 | Notifier | Slack/Gmail처럼 사용자에게 알림이나 승인 요청을 보내는 구현입니다. |

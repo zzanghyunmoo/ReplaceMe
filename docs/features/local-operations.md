@@ -2,18 +2,19 @@
 
 ## 무엇을 하는 기능인가
 
-ReplaceMe는 Docker Compose로 API, PostgreSQL, Kafka, agent image를 함께 실행할
-수 있게 구성되어 있습니다. `/health` endpoint로 PostgreSQL, Kafka, Docker daemon
-연결 상태를 확인합니다.
+ReplaceMe는 Docker Compose로 API, PostgreSQL, Kafka-compatible broker, agent image를 함께 실행할
+수 있게 구성되어 있습니다. Compose의 `kafka` 서비스는 Redpanda를 실행하며,
+애플리케이션은 Kafka API로 접근합니다. `/health` endpoint로 PostgreSQL, broker,
+Docker daemon 연결 상태를 확인합니다.
 
 ## 한눈에 보기
 
 | 항목 | 내용 |
 | --- | --- |
 | 시작 조건 | `.env`를 준비하고 Docker Compose를 실행합니다. |
-| 핵심 책임 | 로컬 API, DB, Kafka, agent image를 함께 띄웁니다. |
+| 핵심 책임 | 로컬 API, DB, Kafka-compatible broker, agent image를 함께 띄웁니다. |
 | 주요 확인 | `/health`, compose container 상태, test 명령입니다. |
-| 실패 시 | DB/Kafka/Docker 연결 문제를 먼저 확인합니다. |
+| 실패 시 | DB/broker/Docker 연결 문제를 먼저 확인합니다. |
 | ZZA-51 이후 | `/health`와 별도로 profile readiness endpoint가 추가될 예정입니다. |
 
 ## 실행 구성
@@ -22,7 +23,7 @@ ReplaceMe는 Docker Compose로 API, PostgreSQL, Kafka, agent image를 함께 실
 flowchart LR
     Compose[docker-compose.yml] --> API[api\nASP.NET Core + Kafka worker]
     Compose --> Postgres[(postgres\nticket / approval / logs)]
-    Compose --> Kafka[(kafka\nagent job topic)]
+    Compose --> Kafka[(kafka service\nRedpanda broker)]
     Compose --> AgentImage[agent-image\nClaude Code + Approval MCP]
     API --> Postgres
     API --> Kafka
@@ -46,15 +47,16 @@ API는 기본적으로 다음 주소에서 열립니다.
 http://localhost:8080
 ```
 
-Kafka는 compose 내부에서는 `kafka:9092`, 호스트에서 직접 실행하는 API/도구에서는
-`localhost:9092`로 접근할 수 있게 dual listener로 구성되어 있습니다.
+Compose의 `kafka` 서비스는 Redpanda를 사용합니다. compose 내부에서는
+`kafka:9092`, 호스트에서 직접 실행하는 API/도구에서는 `localhost:9092`로 접근할
+수 있게 Kafka API listener가 구성되어 있습니다.
 
 ## 환경변수
 
 <!-- markdownlint-disable MD013 -->
 | 환경변수 | 설명 |
 | --- | --- |
-| `DEVAUTOMATION_Queue__KafkaBootstrapServers` | API/worker가 사용할 Kafka broker |
+| `DEVAUTOMATION_Queue__KafkaBootstrapServers` | API/worker가 사용할 Kafka API broker |
 | `DEVAUTOMATION_Agent__AnthropicApiKey` | agent container에 주입할 Anthropic API key |
 | `DEVAUTOMATION_Agent__RemoteRepositoryProvider` | `GitHub` 또는 `GitLab` |
 | `DEVAUTOMATION_Agent__GitHubToken` | GitHub push/PR 생성 token |
@@ -123,7 +125,7 @@ dotnet test DevAutomation.sln
 1. restore가 NuGet package를 정상 복원합니다.
 2. build가 compile error 없이 끝납니다.
 3. test가 domain/service/infrastructure test를 통과합니다.
-4. `/health`는 DB/Kafka/Docker가 준비된 로컬 환경에서 `200 OK`를 반환합니다.
+4. `/health`는 DB/Kafka-compatible broker/Docker가 준비된 로컬 환경에서 `200 OK`를 반환합니다.
 
 로컬 머신에 .NET 8 runtime이 없다면 Docker SDK 이미지로 테스트할 수 있습니다.
 

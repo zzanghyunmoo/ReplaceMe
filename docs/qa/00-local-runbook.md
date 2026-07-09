@@ -4,8 +4,9 @@
 
 ## 목적
 
-ReplaceMe API, PostgreSQL, Kafka, Docker agent image가 로컬에서 실행 가능한지
-확인합니다. 이 문서를 통과해야 다른 기능별 QA를 안정적으로 진행할 수 있습니다.
+ReplaceMe API, PostgreSQL, Kafka-compatible broker, Docker agent image가 로컬에서
+실행 가능한지 확인합니다. Compose의 `kafka` 서비스는 Redpanda를 실행합니다. 이 문서를
+통과해야 다른 기능별 QA를 안정적으로 진행할 수 있습니다.
 
 ## 사전 준비
 
@@ -53,7 +54,7 @@ docker compose --profile build-only build agent-image
 docker image inspect devautomation-claude:latest >/dev/null && echo "agent image exists"
 ```
 
-## LOCAL-002. API/PostgreSQL/Kafka 실행
+## LOCAL-002. API/PostgreSQL/Redpanda 실행
 
 ```bash
 docker compose up --build api postgres kafka
@@ -62,7 +63,7 @@ docker compose up --build api postgres kafka
 기대 결과:
 
 - `postgres`가 healthy 상태가 됩니다.
-- `kafka`가 broker로 시작됩니다.
+- `kafka` 서비스가 Redpanda Kafka-compatible broker로 시작됩니다.
 - `api`가 `0.0.0.0:8080`에 바인딩됩니다.
 - API 시작 시 EF Core migration이 적용됩니다.
 
@@ -94,7 +95,7 @@ curl -s "$BASE_URL/health" | jq .
 | --- | --- | --- |
 | HTTP 200 + 모두 `ok` | 로컬 인프라 준비 완료 | 다음 QA로 이동 |
 | `db` failed | PostgreSQL 연결 실패 | `docker compose ps postgres`, `docker compose logs postgres` 확인 |
-| `kafka` failed | Kafka metadata 조회 실패 | `docker compose logs kafka` 확인 |
+| `kafka` failed | Kafka API metadata 조회 실패 | `docker compose logs kafka` 확인 |
 | `docker` failed | API container에서 Docker daemon 접근 실패 | Docker socket volume mount 확인 |
 
 ## LOCAL-004. build/test 검증
@@ -153,7 +154,7 @@ find logs -type f -maxdepth 1 -print
 docker compose down
 docker compose up --build api postgres kafka
 
-# DB까지 초기화
+# DB와 broker volume까지 초기화
 docker compose down -v
 docker compose up --build api postgres kafka
 ```
@@ -161,7 +162,7 @@ docker compose up --build api postgres kafka
 ## 완료 체크리스트
 
 - [ ] `agent-image` build 성공
-- [ ] `docker compose ps`에서 API/PostgreSQL/Kafka 실행 확인
+- [ ] `docker compose ps`에서 API/PostgreSQL/Redpanda 실행 확인
 - [ ] `/health`가 `db/kafka/docker = ok` 반환
 - [ ] `dotnet build` 성공
 - [ ] host 또는 Docker SDK 8에서 `dotnet test` 성공
