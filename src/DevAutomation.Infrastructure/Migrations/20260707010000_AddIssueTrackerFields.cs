@@ -1,9 +1,13 @@
+using DevAutomation.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace DevAutomation.Infrastructure.Migrations;
 
+[DbContext(typeof(DevAutomationDbContext))]
+[Migration("20260707010000_AddIssueTrackerFields")]
 public partial class AddIssueTrackerFields : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
