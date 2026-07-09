@@ -57,6 +57,7 @@ POST /api/tickets
 }
 
 GET /api/tickets/{id}
+GET /api/tickets/{id}/run-passport
 GET /api/tickets?status=Running&page=1&pageSize=20
 POST /api/tickets/{id}/cancel
 GET /api/tickets/{id}/logs?page=1&pageSize=100
