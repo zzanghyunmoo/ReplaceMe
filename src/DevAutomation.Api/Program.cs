@@ -213,6 +213,12 @@ app.MapGet("/api/tickets/{id:guid}", async (Guid id, DevAutomationDbContext dbCo
     return ticket is null ? Results.NotFound() : Results.Ok(TicketResponse.From(ticket));
 });
 
+app.MapGet("/api/tickets/{id:guid}/run-passport", async (Guid id, DevAutomationDbContext dbContext, CancellationToken cancellationToken) =>
+{
+    var ticket = await dbContext.Tickets.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    return ticket is null ? Results.NotFound() : Results.Ok(RunPassportSummaryResponse.From(ticket));
+});
+
 app.MapPost("/api/tickets/{id:guid}/documents", async (
     Guid id,
     DevAutomationDbContext dbContext,
