@@ -126,7 +126,8 @@ docker run --rm -v "$PWD":/src -w /src \
 - host `dotnet test`가 .NET 9 runtime 부재로 실패하면 Docker SDK 9 결과를 기준으로
   기록합니다.
 - Docker build 중 Debian repository GPG signature 오류가 나면 애플리케이션 코드보다
-  현재 Docker/Debian mirror 또는 proxy 경로를 먼저 확인합니다.
+  Docker Desktop VM 디스크 여유 공간을 먼저 확인합니다. 컨테이너 안의 `/`가 100%면
+  `docker builder prune -af`로 재생성 가능한 build cache를 정리한 뒤 다시 시도합니다.
 
 ## LOCAL-005. DB migration 확인
 
