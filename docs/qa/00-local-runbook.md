@@ -15,10 +15,10 @@ ReplaceMe API, PostgreSQL, Kafka-compatible broker, Docker agent image가 로컬
 | Docker Desktop 또는 Docker Engine | 필수 | `docker version` |
 | Docker Compose v2 | 필수 | `docker compose version` |
 | .NET SDK | 권장 | `dotnet --info` |
-| .NET 8 runtime | host test 실행 시 필요 | `dotnet --list-runtimes` |
+| .NET 9 runtime | host test 실행 시 필요 | `dotnet --list-runtimes` |
 | `jq` | 선택 | `jq --version` |
 
-로컬 host에 .NET 8 runtime이 없으면 Docker SDK 8 이미지로 test를 실행하면 됩니다.
+로컬 host에 .NET 9 runtime이 없으면 Docker SDK 9 이미지로 test를 실행하면 됩니다.
 
 ## 기본 환경 준비
 
@@ -47,6 +47,8 @@ docker compose --profile build-only build agent-image
 
 - `devautomation-claude:latest` image build가 성공합니다.
 - 실패하면 `Dockerfile.agent`와 네트워크/NuGet/npm 접근을 먼저 확인합니다.
+- 내부 HTTPS proxy에서 NuGet/npm 인증서 오류가 나면 로컬 CA 인증서(`*.crt`)를
+  `docker/certs/`에 둔 뒤 다시 build합니다. `.crt` 파일은 git에 커밋하지 않습니다.
 
 확인 명령:
 
@@ -100,7 +102,7 @@ curl -s "$BASE_URL/health" | jq .
 
 ## LOCAL-004. build/test 검증
 
-host에 .NET 8 SDK/runtime이 있으면 다음을 실행합니다.
+host에 .NET 9 SDK/runtime이 있으면 다음을 실행합니다.
 
 ```bash
 dotnet restore DevAutomation.sln
@@ -108,12 +110,12 @@ dotnet build DevAutomation.sln
 dotnet test DevAutomation.sln
 ```
 
-host에 .NET 8 SDK/runtime이 없으면 restore, build, test를 모두 Docker SDK 8 안에서
+host에 .NET 9 SDK/runtime이 없으면 restore, build, test를 모두 Docker SDK 9 안에서
 실행합니다. 이 경로에서는 host `dotnet` 명령을 사용하지 않습니다.
 
 ```bash
 docker run --rm -v "$PWD":/src -w /src \
-  mcr.microsoft.com/dotnet/sdk:8.0 \
+  mcr.microsoft.com/dotnet/sdk:9.0 \
   sh -lc 'dotnet restore DevAutomation.sln && dotnet build DevAutomation.sln --no-restore && dotnet test DevAutomation.sln --no-build'
 ```
 
@@ -121,8 +123,10 @@ docker run --rm -v "$PWD":/src -w /src \
 
 - build warning/error 없이 성공합니다.
 - test가 모두 통과합니다.
-- host `dotnet test`가 .NET 8 runtime 부재로 실패하면 Docker SDK 8 결과를 기준으로
+- host `dotnet test`가 .NET 9 runtime 부재로 실패하면 Docker SDK 9 결과를 기준으로
   기록합니다.
+- Docker build 중 Debian repository GPG signature 오류가 나면 애플리케이션 코드보다
+  현재 Docker/Debian mirror 또는 proxy 경로를 먼저 확인합니다.
 
 ## LOCAL-005. DB migration 확인
 
@@ -165,7 +169,7 @@ docker compose up --build api postgres kafka
 - [ ] `docker compose ps`에서 API/PostgreSQL/Redpanda 실행 확인
 - [ ] `/health`가 `db/kafka/docker = ok` 반환
 - [ ] `dotnet build` 성공
-- [ ] host 또는 Docker SDK 8에서 `dotnet test` 성공
+- [ ] host 또는 Docker SDK 9에서 `dotnet test` 성공
 - [ ] DB table 확인
 - [ ] 파일 로그 생성 확인
 
