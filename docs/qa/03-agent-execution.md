@@ -113,6 +113,10 @@ DEVAUTOMATION_Agent__GitHubToken=<scratch repo push 가능한 token>
 DEVAUTOMATION_Agent__AnthropicApiKey=<Anthropic API key>
 DEVAUTOMATION_CodingAgent__Provider=ClaudeCode
 DEVAUTOMATION_CodingAgent__ClaudeCommand=claude
+DEVAUTOMATION_Agent__ExecutionIsolationProfile=LocalDevelopment
+DEVAUTOMATION_Agent__DockerSocketMode=LocalDockerSocket
+DEVAUTOMATION_Agent__AllowLocalDockerSocket=true
+DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike=false
 DEVAUTOMATION_Notifier__Provider=None
 DEVAUTOMATION_ProfileReadiness__SelectedProfile=
 ```
@@ -163,7 +167,8 @@ curl -s "$BASE_URL/api/tickets/$AGENT_OK_TICKET_ID/logs?page=1&pageSize=200" | j
 기대 결과:
 
 - agent stdout/stderr가 execution log로 저장됩니다.
-- Anthropic/GitHub/GitLab/Slack/Jira/Linear/Gmail/Notion/Confluence secret 원문이 보이면 실패입니다.
+- Anthropic/GitHub/GitLab/Slack/Jira/Linear/Gmail/Notion/Confluence/Langfuse/LiteLLM
+  secret 원문이 보이면 실패입니다.
 - secret은 `[REDACTED]`로 보여야 합니다.
 
 추가 secret scan은 실제 `.env`에 설정된 secret 값을 기준으로 수행합니다. 아래 스크립트는
@@ -190,6 +195,10 @@ secret_keys = [
     'DEVAUTOMATION_Notion__ApiToken',
     'DEVAUTOMATION_Jira__ApiToken',
     'DEVAUTOMATION_Confluence__ApiToken',
+    'DEVAUTOMATION_Langfuse__PublicKey',
+    'DEVAUTOMATION_Langfuse__SecretKey',
+    'DEVAUTOMATION_LiteLLM__ApiKey',
+    'DEVAUTOMATION_LiteLLM__VirtualKey',
 ]
 values = {}
 for line in Path('.env').read_text(errors='ignore').splitlines():
@@ -214,7 +223,26 @@ grep -R -E "(ghp_|github_pat_|glpat-|sk-ant-|xox[baprs]-|xapp-)" logs \
   || echo "no common secret-like pattern in file logs"
 ```
 
-## AGENT-007. readiness gate safety net 확인
+## AGENT-007. agent container secret allowlist spot check
+
+agent run 중 container environment를 확인할 수 있는 짧은 실행 창이 있으면, 선택하지 않은
+provider/gateway secret이 없는지 확인합니다.
+
+```bash
+docker inspect \
+  --format '{{range .Config.Env}}{{println .}}{{end}}' \
+  "<agent-container-id>" \
+  | grep -E 'GITHUB_TOKEN|GITLAB_TOKEN|ANTHROPIC_API_KEY|LANGFUSE|LITELLM'
+```
+
+기대 결과:
+
+- GitHub provider run이면 `GITHUB_TOKEN`은 있을 수 있지만 `GITLAB_TOKEN`은 없어야 합니다.
+- GitLab provider run이면 `GITLAB_TOKEN`은 있을 수 있지만 `GITHUB_TOKEN`은 없어야 합니다.
+- 현재 direct Claude Code path는 `ANTHROPIC_API_KEY`만 사용합니다.
+- Langfuse/LiteLLM secret은 redaction 대상이지만 기본 agent container env에는 없어야 합니다.
+
+## AGENT-008. readiness gate safety net 확인
 
 `DevAutomation.Worker`가 API와 분리되어 있으므로 queued ticket을 만든 뒤 worker만
 나중에 시작하는 방식으로 `AgentJob.RunAsync`의 readiness safety net을 비교적
@@ -284,7 +312,8 @@ docker compose exec kafka rpk topic consume devautomation.agent-jobs.dlq -n 1
 - [ ] 종료 후 agent container가 남지 않음
 - [ ] scratch repo full run이 branch/PR을 생성
 - [ ] 성공 ticket에 `prUrl` 저장
-- [ ] execution log에 secret 원문 노출 없음
+- [ ] execution log에 Langfuse/LiteLLM 포함 secret 원문 노출 없음
+- [ ] agent container env에 선택하지 않은 provider/gateway secret이 없음
 - [ ] worker를 나중에 시작하는 방식으로 readiness safety net이 agent container 생성 전에 차단함을 확인
 - [ ] poison message가 `devautomation.agent-jobs.dlq`에 sanitized context와 함께 들어감
 

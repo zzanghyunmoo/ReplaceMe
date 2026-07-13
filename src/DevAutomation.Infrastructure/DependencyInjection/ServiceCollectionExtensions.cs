@@ -40,6 +40,8 @@ public static class ServiceCollectionExtensions
         services.Configure<NotionOptions>(configuration.GetSection(NotionOptions.SectionName));
         services.Configure<ConfluenceOptions>(configuration.GetSection(ConfluenceOptions.SectionName));
         services.Configure<CodingAgentOptions>(configuration.GetSection(CodingAgentOptions.SectionName));
+        services.Configure<LangfuseOptions>(configuration.GetSection(LangfuseOptions.SectionName));
+        services.Configure<LiteLlmOptions>(configuration.GetSection(LiteLlmOptions.SectionName));
         services.Configure<ProfileReadinessOptions>(configuration.GetSection(ProfileReadinessOptions.SectionName));
 
         services.AddSingleton<IClock, SystemClock>();
@@ -71,6 +73,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IProfileReadinessCheck, PostgresReadinessCheck>();
         services.AddScoped<IProfileReadinessCheck, KafkaReadinessCheck>();
         services.AddScoped<IProfileReadinessCheck, DockerReadinessCheck>();
+        services.AddScoped<IProfileReadinessCheck, AgentIsolationReadinessCheck>();
         services.AddScoped<IProfileReadinessCheck, AgentImageReadinessCheck>();
         services.AddHttpClient<IProfileReadinessCheck, GitHubRepositoryReadinessCheck>();
         services.AddScoped<IProfileReadinessCheck, GitHubReadinessCheck>();

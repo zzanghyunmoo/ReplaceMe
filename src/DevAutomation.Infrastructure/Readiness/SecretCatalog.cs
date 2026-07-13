@@ -15,6 +15,8 @@ public sealed class SecretCatalog : ISecretCatalog
     private readonly GmailOptions _gmailOptions;
     private readonly NotionOptions _notionOptions;
     private readonly ConfluenceOptions _confluenceOptions;
+    private readonly LangfuseOptions _langfuseOptions;
+    private readonly LiteLlmOptions _liteLlmOptions;
 
     public SecretCatalog(
         IConfiguration configuration,
@@ -24,7 +26,9 @@ public sealed class SecretCatalog : ISecretCatalog
         IOptions<LinearOptions> linearOptions,
         IOptions<GmailOptions> gmailOptions,
         IOptions<NotionOptions> notionOptions,
-        IOptions<ConfluenceOptions> confluenceOptions)
+        IOptions<ConfluenceOptions> confluenceOptions,
+        IOptions<LangfuseOptions> langfuseOptions,
+        IOptions<LiteLlmOptions> liteLlmOptions)
     {
         _configuration = configuration;
         _agentOptions = agentOptions.Value;
@@ -34,6 +38,8 @@ public sealed class SecretCatalog : ISecretCatalog
         _gmailOptions = gmailOptions.Value;
         _notionOptions = notionOptions.Value;
         _confluenceOptions = confluenceOptions.Value;
+        _langfuseOptions = langfuseOptions.Value;
+        _liteLlmOptions = liteLlmOptions.Value;
     }
 
     public IReadOnlyList<SecretCatalogEntry> GetSecrets() =>
@@ -48,6 +54,10 @@ public sealed class SecretCatalog : ISecretCatalog
         new("Linear:ApiKey", _linearOptions.ApiKey),
         new("Gmail:AccessToken", _gmailOptions.AccessToken),
         new("Notion:ApiToken", _notionOptions.ApiToken),
-        new("Confluence:ApiToken", _confluenceOptions.ApiToken)
+        new("Confluence:ApiToken", _confluenceOptions.ApiToken),
+        new("Langfuse:PublicKey", _langfuseOptions.PublicKey),
+        new("Langfuse:SecretKey", _langfuseOptions.SecretKey),
+        new("LiteLLM:ApiKey", _liteLlmOptions.ApiKey),
+        new("LiteLLM:VirtualKey", _liteLlmOptions.VirtualKey)
     ];
 }

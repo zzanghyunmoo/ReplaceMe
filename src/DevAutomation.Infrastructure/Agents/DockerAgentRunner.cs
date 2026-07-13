@@ -6,6 +6,7 @@ using DevAutomation.Core.Abstractions;
 using DevAutomation.Core.Entities;
 using DevAutomation.Core.Options;
 using DevAutomation.Infrastructure.CodingAgents;
+using DevAutomation.Infrastructure.Readiness.Checks;
 using DevAutomation.Infrastructure.RemoteRepositories;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -49,6 +50,11 @@ public sealed class DockerAgentRunner : IAgentRunner, IDisposable
         Func<AgentLogEvent, CancellationToken, Task> onLog,
         CancellationToken cancellationToken)
     {
+        EnsureLocalDockerSocketAllowed(
+            _options,
+            _configuration["ASPNETCORE_ENVIRONMENT"],
+            _configuration["DOTNET_ENVIRONMENT"]);
+
         var command = BuildAgentScript();
         var env = BuildEnvironment(ticket);
         var response = await _dockerClient.Containers.CreateContainerAsync(new CreateContainerParameters
@@ -97,6 +103,23 @@ public sealed class DockerAgentRunner : IAgentRunner, IDisposable
         {
             await RemoveContainerAsync(containerId);
         }
+    }
+
+    public static void EnsureLocalDockerSocketAllowed(
+        AgentOptions options,
+        string? aspNetCoreEnvironment = null,
+        string? dotNetEnvironment = null)
+    {
+        var posture = AgentIsolationReadinessCheck.EvaluateDockerSocketPosture(
+            options,
+            aspNetCoreEnvironment,
+            dotNetEnvironment);
+        if (!posture.BlocksRun)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(posture.Summary);
     }
 
     public async Task StopAsync(Guid ticketId, string? containerId, CancellationToken cancellationToken)

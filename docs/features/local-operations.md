@@ -105,6 +105,13 @@ Dockerfiles가 build 시 image trust store에 추가합니다.
 | `DEVAUTOMATION_Agent__GitHubToken` | GitHub push/PR 생성 token |
 | `DEVAUTOMATION_Agent__GitLabToken` | GitLab push/MR 생성 token |
 | `DEVAUTOMATION_Agent__DockerNetwork` | agent container가 붙을 Docker network |
+| `DEVAUTOMATION_Agent__ExecutionIsolationProfile` | local은 `LocalDevelopment`, 공유 환경은 `ProductionLike` |
+| `DEVAUTOMATION_Agent__DockerSocketMode` | local Compose runner는 `LocalDockerSocket` |
+| `DEVAUTOMATION_Agent__AllowLocalDockerSocket` | host Docker socket 사용 명시적 opt-in |
+| `DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike` | production-like 예외 opt-in |
+| `DEVAUTOMATION_Langfuse__SecretKey` | 선택적 AI observability secret, 기본 비활성 |
+| `DEVAUTOMATION_LiteLLM__ApiKey` | 선택적 gateway admin/proxy secret, 기본 비활성 |
+| `DEVAUTOMATION_LiteLLM__VirtualKey` | 선택적 gateway virtual key, 기본 비활성 |
 | `DEVAUTOMATION_Notifier__Provider` | `Slack`, `Gmail`, `None` |
 | `DEVAUTOMATION_IssueTracker__Provider` | `Jira`, `Linear`, `None` |
 | `DEVAUTOMATION_DocumentTool__Provider` | `Notion`, `Confluence`, `None` |
@@ -114,7 +121,21 @@ Dockerfiles가 build 시 image trust store에 추가합니다.
 <!-- markdownlint-enable MD013 -->
 
 `appsettings.json`에는 민감값을 넣지 않고, `.env` 또는 runtime environment로
-주입합니다. 전체 예시는 `.env.example`을 참고하세요.
+주입합니다. 전체 예시는 `.env.example`을 참고하세요. Langfuse/LiteLLM 값은 향후
+AI observability/gateway 통합을 위한 placeholder이며 core local stack에서는 비워 둡니다.
+
+## Local-only Docker socket safety
+
+`api`와 `worker`는 local Compose에서 host Docker socket을 mount합니다. 이 구성은
+agent container 생성과 Docker readiness를 위한 local-only 편의 기능입니다.
+공유 또는 production-like 환경에서는 `DEVAUTOMATION_Agent__ExecutionIsolationProfile=ProductionLike`를
+설정해야 하며, local socket 예외 opt-in이 없으면 readiness가 required failure를
+반환합니다. 예외 opt-in을 켜더라도 임시 break-glass로 기록하고, host socket 없는 격리
+runner로 이전해야 합니다.
+
+ZZA-62 observability profile이나 향후 Langfuse/LiteLLM profile을 켜도 이 원칙은 변하지
+않습니다. observability/gateway secret은 redaction catalog에 포함되지만, local stack은
+기본적으로 해당 서비스를 요구하거나 agent container에 해당 secret을 전달하지 않습니다.
 
 ## Health check
 
@@ -198,7 +219,6 @@ docker run --rm -v "$PWD":/src -w /src \
 ## 현재 한계
 
 - production deployment manifest는 아직 없습니다.
-- Docker socket mount는 로컬 개발용이며, 운영에서는 별도 격리가 필요합니다. 현재 API도
-  cancellation과 Docker health check 때문에 socket을 공유하며, worker-only Docker control
-  전환은 ZZA-64에서 다룹니다.
+- Docker socket mount는 local-only로 명시되어 있으며 readiness와 runner guard에서
+  warning/block을 제공합니다. 운영 등급 runner 격리는 후속 작업입니다.
 - Kafka worker는 처리 예외를 bounded retry 후 DLQ로 보내지만, DLQ replay tooling은 아직 수동 운영 절차입니다.
