@@ -42,6 +42,12 @@
   QA 문서 목차
 - [`plans/2026-07-08-001-feat-personal-github-linear-notion-profile-plan.md`](./plans/2026-07-08-001-feat-personal-github-linear-notion-profile-plan.md) —
   ZZA-51 `personal-github-linear-notion` readiness profile 구현 계획
+- [`plans/2026-07-13-001-feat-infra-foundation-roadmap-plan.md`](./plans/2026-07-13-001-feat-infra-foundation-roadmap-plan.md) —
+  ZZA-59~64 인프라 로드맵과 선후관계
+- [`plans/2026-07-13-002-feat-notion-lifecycle-pattern-bank-plan.md`](./plans/2026-07-13-002-feat-notion-lifecycle-pattern-bank-plan.md) —
+  ZZA-52 Notion lifecycle/pattern bank 설계
+- [`plans/2026-07-13-003-feat-github-pr-review-packet-plan.md`](./plans/2026-07-13-003-feat-github-pr-review-packet-plan.md) —
+  ZZA-55 GitHub PR review packet 설계
 - [`ideation/2026-07-08-replaceme-github-linear-notion-dev-automation-ideation.html`](./ideation/2026-07-08-replaceme-github-linear-notion-dev-automation-ideation.html) —
   GitHub·Linear·Notion 개인 개발 자동화 아이디에이션
 <!-- markdownlint-enable MD013 -->
@@ -58,7 +64,7 @@ ReplaceMe는 지금 “요구사항 티켓 → Kafka 큐 → 격리 컨테이너
 
 | 용어 | 쉬운 설명 |
 | --- | --- |
-| Kafka API broker | 티켓 실행 작업을 worker에게 전달하는 메시지 큐입니다. 로컬 Compose에서는 Redpanda가 이 역할을 합니다. |
+| Kafka API broker | 티켓 실행 작업을 worker에게 전달하는 메시지 큐입니다. |
 | MCP | 코딩 에이전트가 외부 도구를 안전하게 호출하게 해주는 연결 규격입니다. |
 | Provider | GitHub/GitLab, Linear/Jira처럼 교체 가능한 외부 도구 구현입니다. |
 | Notifier | Slack/Gmail처럼 사용자에게 알림이나 승인 요청을 보내는 구현입니다. |

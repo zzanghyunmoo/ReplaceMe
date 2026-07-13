@@ -41,11 +41,11 @@ DEVAUTOMATION_Slack__SigningSecret=<Slack signing secret>
 DEVAUTOMATION_Slack__ChannelId=C0123456789
 ```
 
-API를 재시작합니다.
+API와 worker를 재시작합니다.
 
 ```bash
 docker compose down
-docker compose up --build api postgres kafka
+docker compose up --build api worker postgres kafka
 ```
 
 Slack App 설정에서 Interactivity Request URL을 다음으로 지정합니다.

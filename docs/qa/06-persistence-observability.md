@@ -176,7 +176,7 @@ grep -R -E "(ghp_|github_pat_|glpat-|sk-ant-|xox[baprs]-|xapp-)" logs \
 - configured secret value가 발견되면 실패입니다. 출력은 key 이름만 표시하고 secret 원문은 표시하지 않습니다.
 - common token pattern이 보이면 추가 확인 대상입니다.
 - secret이 필요한 경우 `[REDACTED]`로 보여야 합니다.
-- Notion 등 secret catalog gap은 readiness profile의 `secrets.redaction.coverage` warning으로 확인합니다.
+- secret catalog coverage는 readiness profile의 `secrets.redaction.coverage` check로 함께 확인합니다.
 
 ## OBS-007. OpenTelemetry 설정 smoke test
 
@@ -187,11 +187,11 @@ DEVAUTOMATION_Telemetry__Enabled=true
 DEVAUTOMATION_Telemetry__OtlpEndpoint=http://<collector-host>:4317
 ```
 
-API를 재시작한 뒤 `/health`, ticket 생성 등을 실행합니다.
+API와 worker를 재시작한 뒤 `/health`, ticket 생성 등을 실행합니다.
 
 기대 결과:
 
-- collector에 ASP.NET Core request trace/metric이 들어옵니다.
+- collector에 API ASP.NET Core request trace/metric과 worker `DevAutomationTelemetry` activity/metric이 들어옵니다.
 - collector가 없으면 export 실패 로그가 날 수 있으므로 기본 QA에서는 비활성화합니다.
 
 ## 완료 체크리스트

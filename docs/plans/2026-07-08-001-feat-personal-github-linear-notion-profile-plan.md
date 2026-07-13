@@ -9,9 +9,9 @@ product_contract_source: ce-brainstorm
 execution: code
 ---
 
-# Personal GitHub Linear Notion Profile - Plan
-
 <!-- markdownlint-disable -->
+
+# Personal GitHub Linear Notion Profile - Plan
 
 ## Goal Capsule
 

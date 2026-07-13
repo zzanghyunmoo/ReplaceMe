@@ -124,7 +124,7 @@ curl http://localhost:8080/api/tickets/{ticket-id}/logs
 
 - `FailReason` 필드
 - `GET /api/tickets/{ticket-id}/logs`
-- API/worker 로그 `logs/devautomation-.log`
+- API 로그 `logs/devautomation-*.log`, worker 로그 `logs/devautomation-worker-*.log`
 
 ## 현재 한계
 

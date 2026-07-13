@@ -8,9 +8,9 @@ product_contract_source: ce-plan-bootstrap
 execution: code
 ---
 
-# ReplaceMe Infra Foundation Roadmap - Plan
-
 <!-- markdownlint-disable MD013 MD025 MD036 -->
+
+# ReplaceMe Infra Foundation Roadmap - Plan
 
 ## Goal Capsule
 
@@ -33,7 +33,7 @@ The work keeps the current .NET API, PostgreSQL, Redpanda/Kafka, Docker agent ru
 
 ### Problem Frame
 
-ReplaceMe currently runs the Minimal API and `KafkaAgentWorker` in the same host, persists tickets and execution logs to PostgreSQL, uses Redpanda as a Kafka-compatible broker, and launches Claude Code in Docker containers through `DockerAgentRunner`.
+At roadmap creation, ReplaceMe ran the Minimal API and `KafkaAgentWorker` in the same host. As of 2026-07-13, U1 is merged: `DevAutomation.Api` and `DevAutomation.Worker` now run as separate Compose services with a `migrate` one-shot service applying EF Core migrations first. ReplaceMe still persists tickets and execution logs to PostgreSQL, uses Redpanda as a Kafka-compatible broker, and launches Claude Code in Docker containers through `DockerAgentRunner`.
 The app already has OpenTelemetry hooks, Serilog file logs, a readiness profile, and secret redaction, but the compose stack has no OTLP collector or observability backend, Kafka jobs have no bounded retry/DLQ path, and the local runner mounts the host Docker socket.
 Langfuse is the right first AI-observability layer because the product's core questions are run quality, prompt/model cost, latency, failure cause, and approval handoff timing.
 LiteLLM is promising as a gateway, but it should remain a spike until Claude Code proxy compatibility, virtual-key delivery, and trace/cost routing are proven.
@@ -170,35 +170,36 @@ flowchart LR
 - Notion background: [인프라 아키텍처 아이디에이션](https://app.notion.com/p/39cef22ad4fc81f298fec2e6c87b101d).
 - Notion execution plan: [2026-07-13 인프라 로드맵과 티켓 선후관계](https://app.notion.com/p/39cef22ad4fc812c80f4ff18f3e1b643).
 
-| Unit | Issue | Priority | Intent |
-| --- | --- | --- | --- |
-| U1 | [ZZA-59](https://linear.app/zzanghyunmoo/issue/ZZA-59/api와-worker-런타임-분리) | Medium | API and worker runtime split. |
-| U2 | [ZZA-61](https://linear.app/zzanghyunmoo/issue/ZZA-61/kafka-재시도와-dlq-처리-추가) | High | Kafka retry and DLQ behavior. |
-| U3 | [ZZA-62](https://linear.app/zzanghyunmoo/issue/ZZA-62/opentelemetry-collector-기반-로컬-관측성-프로필-추가) | Medium | OTel Collector local observability profile. |
-| U4 | [ZZA-60](https://linear.app/zzanghyunmoo/issue/ZZA-60/langfuse-ai-실행-trace-연동) | Medium | Langfuse AI-run tracing. |
-| U5 | [ZZA-63](https://linear.app/zzanghyunmoo/issue/ZZA-63/litellm-proxy-호환성-spike) | Low | LiteLLM proxy compatibility spike. |
-| U6 | [ZZA-64](https://linear.app/zzanghyunmoo/issue/ZZA-64/agent-실행-격리와-secret-경계-hardening) | High | Agent isolation and secret boundary hardening. |
+| Unit | Issue | Priority | Status | Intent |
+| --- | --- | --- | --- | --- |
+| U1 | [ZZA-59](https://linear.app/zzanghyunmoo/issue/ZZA-59/api와-worker-런타임-분리) | Medium | Done | API and worker runtime split. |
+| U2 | [ZZA-61](https://linear.app/zzanghyunmoo/issue/ZZA-61/kafka-재시도와-dlq-처리-추가) | High | Next | Kafka retry and DLQ behavior. |
+| U3 | [ZZA-62](https://linear.app/zzanghyunmoo/issue/ZZA-62/opentelemetry-collector-기반-로컬-관측성-프로필-추가) | Medium | Next | OTel Collector local observability profile. |
+| U4 | [ZZA-60](https://linear.app/zzanghyunmoo/issue/ZZA-60/langfuse-ai-실행-trace-연동) | Medium | Blocked by U2/U3/U6 | Langfuse AI-run tracing. |
+| U5 | [ZZA-63](https://linear.app/zzanghyunmoo/issue/ZZA-63/litellm-proxy-호환성-spike) | Low | Spike after U4 baseline | LiteLLM proxy compatibility spike. |
+| U6 | [ZZA-64](https://linear.app/zzanghyunmoo/issue/ZZA-64/agent-실행-격리와-secret-경계-hardening) | High | Next | Agent isolation and secret boundary hardening. |
 
 | Existing issue | Relationship to this plan | Execution guidance |
 | --- | --- | --- |
-| [ZZA-58](https://linear.app/zzanghyunmoo/issue/ZZA-58/replaceme-net-9-로컬-빌드-경로-정렬) | Precondition for U1. | Finish before ZZA-59. |
-| [ZZA-52](https://linear.app/zzanghyunmoo/issue/ZZA-52/notion-작업-문서와-패턴-뱅크-설계) | Consumes Run Passport v0 and later Langfuse evidence. | Design can proceed now; automation hooks should wait for ZZA-59. |
-| [ZZA-55](https://linear.app/zzanghyunmoo/issue/ZZA-55/github-pr-리뷰-패킷-설계) | Consumes ZZA-52 links and Run Passport v0. | Start after ZZA-52 link contract; optionally enrich after ZZA-60. |
+| [ZZA-58](https://linear.app/zzanghyunmoo/issue/ZZA-58/replaceme-net-9-로컬-빌드-경로-정렬) | Historical precondition for U1. | No longer blocking after ZZA-59 merge. |
+| [ZZA-52](https://linear.app/zzanghyunmoo/issue/ZZA-52/notion-작업-문서와-패턴-뱅크-설계) | Consumes Run Passport v0 and later Langfuse evidence. | Design plan is done; automation hooks can now build on the merged API/worker split, but should still wait for retry/DLQ when background publishing is automatic. |
+| [ZZA-55](https://linear.app/zzanghyunmoo/issue/ZZA-55/github-pr-리뷰-패킷-설계) | Consumes ZZA-52 links and Run Passport v0. | Design plan is done; optionally enrich after ZZA-60. |
 | [ZZA-53](https://linear.app/zzanghyunmoo/issue/ZZA-53/linear-이슈-실행-지시서-설계) | Top-level execution workflow. | Start after ZZA-59, ZZA-61, ZZA-64, ZZA-52, and ZZA-55. |
 | [ZZA-54](https://linear.app/zzanghyunmoo/issue/ZZA-54/provider-doctor와-로컬-안전문-설계) | Mostly covered by ZZA-51 and U6 hardening. | Recheck after ZZA-64; close if duplicate or redefine remaining scope. |
 
 ### Assumptions
 
 - Linear project `ReplaceMe` remains the tracking surface for this plan's tickets.
-- The first implementation pass may keep one deployable image for API and worker if startup mode cleanly selects the process role; a separate worker project is preferred when it reduces host complexity.
+- U1 resolved the runtime split with separate `DevAutomation.Api` and `DevAutomation.Worker` projects and separate Compose service targets.
 - Langfuse may be SaaS or self-hosted; ReplaceMe should integrate through environment-configured endpoints and should not share the application PostgreSQL database with Langfuse internals.
 - LiteLLM official proxy features such as virtual keys, cost tracking, rate limiting, and gateway routing are relevant only after Claude Code compatibility is proven.
 
 ### Sources and Research
 
 - `README.md` for current architecture and supported providers.
-- `docker-compose.yml` for current API, PostgreSQL, Redpanda, and agent-image services.
-- `src/DevAutomation.Api/Program.cs` for API/worker hosting, OpenTelemetry wiring, and health checks.
+- `docker-compose.yml` for current API, worker, migrate, PostgreSQL, Redpanda, and agent-image services.
+- `src/DevAutomation.Api/Program.cs` for API hosting, OpenTelemetry wiring, migration-only mode, and health checks.
+- `src/DevAutomation.Worker/Program.cs` for worker hosting and worker OpenTelemetry wiring.
 - `src/DevAutomation.Infrastructure/Queues/KafkaAgentWorker.cs` for current consume/commit behavior.
 - `src/DevAutomation.Infrastructure/Agents/AgentJob.cs` and `src/DevAutomation.Infrastructure/Agents/DockerAgentRunner.cs` for run lifecycle, logs, and Docker execution.
 - `src/DevAutomation.Infrastructure/Readiness/SecretCatalog.cs` and `src/DevAutomation.Infrastructure/Agents/SecretRedactor.cs` for current redaction coverage.
@@ -208,7 +209,7 @@ flowchart LR
 
 ### System-Wide Impact
 
-- API availability improves because long-running agent work no longer shares the same host lifecycle.
+- API availability has improved for U1 because long-running agent work no longer shares the same host lifecycle.
 - Operational debugging shifts from DB/file-log-only inspection to traces, metrics, DLQ messages, and Langfuse AI traces.
 - Agent-run privacy risk increases if observability sinks receive raw prompts or outputs, so redaction and attribute allowlists become part of every telemetry unit.
 - Compose grows optional profiles; documentation must keep the default path small enough for daily local use.
@@ -227,6 +228,7 @@ flowchart LR
 
 ### U1. Split API and worker runtime
 
+- **Status:** Done on 2026-07-13 in PR #14.
 - **Goal:** Run HTTP API serving and Kafka agent consumption as separate process roles.
 - **Requirements:** R1, R2, AE1.
 - **Dependencies:** None.

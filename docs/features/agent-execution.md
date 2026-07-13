@@ -75,10 +75,11 @@ flowchart TD
 - 각 줄은 `ClaudeStreamParser`를 거쳐 `AgentLogEvent`로 변환됩니다.
 - JSON line이면 `type` 필드를 event type으로 사용합니다.
 - plain text면 `stdout` event로 저장합니다.
-- `SecretRedactor`가 Anthropic, GitHub, GitLab, Slack, Jira, Linear 관련 secret
-  값을 `[REDACTED]`로 치환합니다.
-- Notion 등 추가 provider secret은 ZZA-51 readiness profile에서 redaction gap으로
-  점검할 예정입니다.
+- `SecretRedactor`가 secret catalog에 등록된 Anthropic, GitHub, GitLab,
+  PostgreSQL connection string, Slack, Jira, Linear, Gmail, Notion, Confluence 관련
+  secret 값을 `[REDACTED]`로 치환합니다.
+- readiness profile의 `secrets.redaction.coverage` check가 catalog coverage를
+  계속 점검합니다.
 - `AgentJob`은 로그를 25개씩 buffer 후 DB에 저장합니다.
 
 ## 코드 위치
@@ -114,7 +115,8 @@ docker compose up --build api worker postgres kafka
 
 실패하면 먼저 볼 곳:
 
-- API 로그: `logs/devautomation-.log`
+- API 로그: `logs/devautomation-*.log`
+- worker 로그: `logs/devautomation-worker-*.log`
 - 티켓 로그: `GET /api/tickets/{ticket-id}/logs`
 - Docker 상태: `docker ps -a`, `docker logs <container-id>`
 

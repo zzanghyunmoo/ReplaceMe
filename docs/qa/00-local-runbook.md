@@ -4,9 +4,9 @@
 
 ## 목적
 
-ReplaceMe API, PostgreSQL, Kafka-compatible broker, Docker agent image가 로컬에서
-실행 가능한지 확인합니다. Compose의 `kafka` 서비스는 Redpanda를 실행합니다. 이 문서를
-통과해야 다른 기능별 QA를 안정적으로 진행할 수 있습니다.
+ReplaceMe API, worker, PostgreSQL, Kafka-compatible broker, Docker agent image가
+로컬에서 실행 가능한지 확인합니다. Compose의 `kafka` 서비스는 Redpanda를 실행합니다.
+이 문서를 통과해야 다른 기능별 QA를 안정적으로 진행할 수 있습니다.
 
 ## 사전 준비
 
@@ -56,18 +56,19 @@ docker compose --profile build-only build agent-image
 docker image inspect devautomation-claude:latest >/dev/null && echo "agent image exists"
 ```
 
-## LOCAL-002. API/PostgreSQL/Redpanda 실행
+## LOCAL-002. API/worker/PostgreSQL/Redpanda 실행
 
 ```bash
-docker compose up --build api postgres kafka
+docker compose up --build api worker postgres kafka
 ```
 
 기대 결과:
 
 - `postgres`가 healthy 상태가 됩니다.
 - `kafka` 서비스가 Redpanda Kafka-compatible broker로 시작됩니다.
+- `migrate` one-shot service가 EF Core migration을 적용한 뒤 종료됩니다.
 - `api`가 `0.0.0.0:8080`에 바인딩됩니다.
-- API 시작 시 EF Core migration이 적용됩니다.
+- `worker`가 별도 process로 Kafka agent job을 consume할 준비를 합니다.
 
 다른 터미널에서 확인합니다.
 
@@ -150,6 +151,7 @@ find logs -type f -maxdepth 1 -print
 기대 결과:
 
 - API가 요청을 처리하면 `logs/devautomation-*.log` 파일이 생깁니다.
+- worker가 실행되면 `logs/devautomation-worker-*.log` 파일도 생길 수 있습니다.
 - Docker Compose가 `./logs:/app/logs` volume을 연결하므로 host에서 확인 가능합니다.
 
 ## 실패 시 빠른 복구
@@ -157,17 +159,17 @@ find logs -type f -maxdepth 1 -print
 ```bash
 # 컨테이너만 재시작
 docker compose down
-docker compose up --build api postgres kafka
+docker compose up --build api worker postgres kafka
 
 # DB와 broker volume까지 초기화
 docker compose down -v
-docker compose up --build api postgres kafka
+docker compose up --build api worker postgres kafka
 ```
 
 ## 완료 체크리스트
 
 - [ ] `agent-image` build 성공
-- [ ] `docker compose ps`에서 API/PostgreSQL/Redpanda 실행 확인
+- [ ] `docker compose ps`에서 API/worker/PostgreSQL/Redpanda 실행 확인
 - [ ] `/health`가 `db/kafka/docker = ok` 반환
 - [ ] `dotnet build` 성공
 - [ ] host 또는 Docker SDK 9에서 `dotnet test` 성공

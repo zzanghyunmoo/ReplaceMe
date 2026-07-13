@@ -4,8 +4,9 @@
 
 ReplaceMe는 PostgreSQL에 티켓, 승인 요청, 실행 로그를 저장합니다. API와
 Kafka worker는 같은 `DevAutomationDbContext`를 사용하고, Serilog는 콘솔과 파일에
-구조화 로그를 남깁니다. 선택적으로 OpenTelemetry trace/metric을 OTLP endpoint로
-export할 수 있습니다.
+구조화 로그를 남깁니다. Compose에서는 `migrate` one-shot service가 EF Core
+migration을 먼저 적용한 뒤 API와 worker가 시작됩니다. 선택적으로 OpenTelemetry
+trace/metric을 OTLP endpoint로 export할 수 있습니다.
 
 ## 한눈에 보기
 
@@ -106,8 +107,10 @@ src/DevAutomation.Infrastructure/Migrations/20260707000000_InitialCreate.cs
 src/DevAutomation.Infrastructure/Migrations/20260707010000_AddIssueTrackerFields.cs
 ```
 
-API 시작 시 `Database:ApplyMigrations`가 `true`이면 자동으로
-`Database.MigrateAsync()`를 실행합니다.
+Compose 기본 경로에서는 `migrate` one-shot service가 `Database:RunMigrationsOnly=true`로
+`Database.MigrateAsync()`를 실행하고, `api`와 `worker`는
+`Database:ApplyMigrations=false`로 시작합니다. Compose 밖에서 단일 process로 실행할 때는
+`Database:ApplyMigrations=true`이면 해당 process가 migration을 적용할 수 있습니다.
 
 ## 실행 로그 저장
 
@@ -125,22 +128,25 @@ flowchart LR
 - JSON line: `type` 값을 event type으로 사용
 - 일반 line: `stdout` event type 사용
 - secret 값: 저장 전에 `[REDACTED]`로 치환
-- redaction 대상: Anthropic, GitHub, GitLab, Slack, Jira, Linear secret
-- Notion 등 추가 provider secret은 아직 명시 목록에 없으므로 ZZA-51 readiness
-  profile에서 redaction gap으로 점검합니다.
+- redaction 대상: secret catalog에 등록된 Anthropic, GitHub, GitLab,
+  PostgreSQL connection string, Slack, Jira, Linear, Gmail, Notion, Confluence secret
+- readiness profile의 `secrets.redaction.coverage` check가 catalog coverage를
+  계속 점검합니다.
 - buffer size: 25개 단위 저장
 
 ## Serilog와 OpenTelemetry
 
-API는 Serilog를 사용해 다음 sink로 기록합니다.
+API와 worker는 Serilog를 사용해 다음 sink로 기록합니다.
 
 - console
-- rolling file: `logs/devautomation-.log`
+- API rolling file: `logs/devautomation-*.log`
+- worker rolling file: `logs/devautomation-worker-*.log`
 
 Docker Compose에서는 `./logs:/app/logs` volume을 연결해 컨테이너 밖에서도 로그를
 확인할 수 있습니다.
 
-`Telemetry:Enabled=true`이면 ASP.NET Core, HttpClient, runtime metric과
+`Telemetry:Enabled=true`이면 API는 ASP.NET Core/HttpClient/runtime metric과
+`DevAutomationTelemetry` activity/meter를, worker는 HttpClient/runtime metric과
 `DevAutomationTelemetry` activity/meter를 OTLP exporter로 전송합니다.
 
 ## 코드 위치
@@ -174,7 +180,8 @@ ls logs/
 2. `/api/approvals`는 pending/terminal approval request를 반환합니다.
 3. `/api/tickets/{ticket-id}/logs`는 agent container에서 수집한 log event를
    반환합니다.
-4. 파일 로그는 `logs/devautomation-.log` 패턴으로 쌓입니다.
+4. 파일 로그는 API `logs/devautomation-*.log`, worker
+   `logs/devautomation-worker-*.log` 패턴으로 쌓입니다.
 5. fake secret을 테스트에 넣었다면 log에는 원문 대신 `[REDACTED]`가 보여야
    합니다.
 

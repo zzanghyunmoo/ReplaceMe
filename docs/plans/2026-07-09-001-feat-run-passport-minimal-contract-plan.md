@@ -9,9 +9,9 @@ product_contract_source: ce-plan-bootstrap
 execution: code
 ---
 
-# Run Passport Minimal Contract - Plan
-
 <!-- markdownlint-disable -->
+
+# Run Passport Minimal Contract - Plan
 
 ## Goal Capsule
 
