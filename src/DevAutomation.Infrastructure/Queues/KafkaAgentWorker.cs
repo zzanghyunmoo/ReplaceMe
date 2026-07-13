@@ -1,4 +1,5 @@
 using Confluent.Kafka;
+using Confluent.Kafka.Admin;
 using DevAutomation.Core.Options;
 using DevAutomation.Infrastructure.Agents;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,11 +28,12 @@ public sealed class KafkaAgentWorker : BackgroundService
         _logger = logger;
     }
 
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await EnsureTopicExistsAsync(stoppingToken);
         var workerCount = Math.Max(1, _agentOptions.MaxConcurrentAgents);
         var workers = Enumerable.Range(0, workerCount).Select(index => ConsumeAsync(index, stoppingToken));
-        return Task.WhenAll(workers);
+        await Task.WhenAll(workers);
     }
 
     private async Task ConsumeAsync(int workerIndex, CancellationToken stoppingToken)
@@ -74,6 +76,41 @@ public sealed class KafkaAgentWorker : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Kafka agent worker {WorkerIndex} failed; reconnecting after delay.", workerIndex);
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            }
+        }
+    }
+
+    private async Task EnsureTopicExistsAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                using var adminClient = new AdminClientBuilder(new AdminClientConfig
+                {
+                    BootstrapServers = _queueOptions.KafkaBootstrapServers
+                }).Build();
+
+                await adminClient.CreateTopicsAsync([
+                    new TopicSpecification
+                    {
+                        Name = _queueOptions.KafkaTopic,
+                        NumPartitions = 1,
+                        ReplicationFactor = 1
+                    }
+                ]);
+                _logger.LogInformation("Kafka topic {Topic} created or verified.", _queueOptions.KafkaTopic);
+                return;
+            }
+            catch (CreateTopicsException ex) when (ex.Results.All(result => result.Error.Code == ErrorCode.TopicAlreadyExists))
+            {
+                _logger.LogInformation("Kafka topic {Topic} already exists.", _queueOptions.KafkaTopic);
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Kafka topic {Topic} is not ready; retrying after delay.", _queueOptions.KafkaTopic);
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }

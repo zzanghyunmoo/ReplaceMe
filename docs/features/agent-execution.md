@@ -3,8 +3,9 @@
 ## 무엇을 하는 기능인가
 
 티켓이 생성되면 API가 Kafka topic에 agent job 메시지를 발행합니다.
-`KafkaAgentWorker`가 메시지를 consume하고 `AgentJob.RunAsync(ticketId)`를 실행해
-티켓 상태를 `Running`으로 바꾼 뒤 Docker 컨테이너 하나를 생성합니다. 컨테이너
+별도 `DevAutomation.Worker` process의 `KafkaAgentWorker`가 메시지를 consume하고
+`AgentJob.RunAsync(ticketId)`를 실행해 티켓 상태를 `Running`으로 바꾼 뒤 Docker
+컨테이너 하나를 생성합니다. 컨테이너
 안에서는 설정된 코딩 에이전트 provider가 작업을 수행합니다.
 
 ## 한눈에 보기
@@ -12,7 +13,7 @@
 <!-- markdownlint-disable MD013 -->
 | 항목 | 내용 |
 | --- | --- |
-| 시작 조건 | Kafka topic에 agent job message가 들어옵니다. |
+| 시작 조건 | `DevAutomation.Worker`가 실행 중이고 Kafka topic에 agent job message가 들어옵니다. |
 | 핵심 책임 | 티켓 하나를 격리된 Docker agent 실행으로 바꿉니다. |
 | 주요 출력 | 실행 로그, 티켓 상태 변경, PR/MR URL입니다. |
 | 실패 시 | 티켓을 `Failed`로 바꾸고 실패 사유를 저장합니다. |
@@ -25,7 +26,7 @@
 flowchart TD
     A[POST /api/tickets] --> B[Ticket 저장]
     B --> C[Kafka topic publish]
-    C --> D[KafkaAgentWorker consume]
+    C --> D[DevAutomation.Worker\nKafkaAgentWorker consume]
     D --> E[AgentJob.RunAsync]
     E --> F[DockerAgentRunner.RunAsync]
     F --> G[Docker container 생성]
@@ -82,6 +83,7 @@ flowchart TD
 
 ## 코드 위치
 
+- Worker host: `src/DevAutomation.Worker/Program.cs`
 - Kafka queue: `src/DevAutomation.Infrastructure/Queues/`
 - Job orchestration: `src/DevAutomation.Infrastructure/Agents/AgentJob.cs`
 - Docker 실행: `src/DevAutomation.Infrastructure/Agents/DockerAgentRunner.cs`
@@ -96,15 +98,15 @@ flowchart TD
 # agent image build
 docker compose --profile build-only build agent-image
 
-# API + DB + Kafka 실행
-docker compose up --build api postgres kafka
+# API + worker + DB + Kafka 실행
+docker compose up --build api worker postgres kafka
 ```
 
 기대 결과:
 
 1. `agent-image` build가 성공합니다.
-2. API, PostgreSQL, Kafka container가 실행됩니다.
-3. 티켓을 생성하면 Kafka message가 발행되고 worker가 `AgentJob.RunAsync`를
+2. API, worker, PostgreSQL, Kafka container가 실행됩니다.
+3. 티켓을 생성하면 API가 Kafka message를 발행하고 worker가 `AgentJob.RunAsync`를
    실행합니다.
 4. 성공 시 티켓은 `Completed`가 되고 PR/MR URL이 저장됩니다.
 5. 실패 시 티켓은 `Failed`가 되고 `FailReason`과 execution log를 확인할 수

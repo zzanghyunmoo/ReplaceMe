@@ -57,8 +57,13 @@ public sealed class AgentJob
         var ticket = await _dbContext.Tickets.FirstOrDefaultAsync(x => x.Id == ticketId, cancellationToken)
             ?? throw new InvalidOperationException($"Ticket {ticketId} not found.");
 
-        if (ticket.Status == TicketStatus.Cancelled)
+        if (ticket.Status is TicketStatus.Completed or TicketStatus.Failed or TicketStatus.Cancelled)
         {
+            _logger.LogInformation(
+                "Skipping already terminal ticket {TicketId} with status {TicketStatus}.",
+                ticket.Id,
+                ticket.Status);
+            activity?.SetTag("ticket.status", ticket.Status.ToString());
             return;
         }
 
