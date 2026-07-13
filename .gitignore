@@ -3,6 +3,7 @@ obj/
 .vs/
 logs/
 .env
+docker/certs/*.crt
 *.user
 *.suo
 TestResults/

@@ -1,6 +1,6 @@
 # ReplaceMe / DevAutomation
 
-.NET 8 기반 개발 자동화 오케스트레이션 서버입니다. 티켓을 API로 입력하면
+.NET 9 기반 개발 자동화 오케스트레이션 서버입니다. 티켓을 API로 입력하면
 Kafka 큐를 통해 Docker 컨테이너에서 코딩 에이전트를 실행하고, 민감 작업은 MCP
 approval tool을 통해 active notifier의 승인 알림을 받은 뒤 계속 진행합니다.
 
@@ -46,6 +46,10 @@ Redpanda를 Kafka-compatible broker로 실행하므로 애플리케이션 설정
 `kafka:9092` bootstrap server를 그대로 사용합니다. 에이전트 컨테이너는 같은 Docker
 네트워크(`devautomation-network`)에 붙어 승인 MCP 서버가 PostgreSQL과 notifier
 설정을 사용할 수 있게 구성됩니다.
+
+내부 HTTPS proxy 때문에 Docker build에서 NuGet/npm 인증서 오류가 나면 로컬 CA
+인증서(`*.crt`)를 `docker/certs/`에 넣으세요. 이 파일들은 git에는 ignore되지만
+Docker build 시 image trust store에 추가됩니다.
 
 ## 주요 API
 
@@ -96,13 +100,16 @@ dotnet build DevAutomation.sln
 dotnet test DevAutomation.sln
 ```
 
-로컬에 .NET 8 runtime이 없으면 Docker SDK 이미지로 테스트할 수 있습니다.
+로컬에 .NET 9 runtime이 없으면 Docker SDK 이미지로 테스트할 수 있습니다.
 
 ```bash
 docker run --rm -v "$PWD":/src -w /src \
-  mcr.microsoft.com/dotnet/sdk:8.0 \
+  mcr.microsoft.com/dotnet/sdk:9.0 \
   dotnet test DevAutomation.sln --no-restore
 ```
+
+> Note: .NET 9는 STS release라 지원 기간이 짧습니다. 장기 운영 전에 .NET 10 LTS
+> 전환 여부를 다시 확인하세요.
 
 ## 보안 메모
 

@@ -1,0 +1,25 @@
+# Git / local metadata
+.git
+.gitignore
+.pi
+.pi-subagents
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Build outputs and test artifacts
+**/bin/
+**/obj/
+TestResults/
+coverage/
+
+# Local logs
+logs/
+
+# IDE / OS noise
+.vs/
+.vscode/
+.idea/
+.DS_Store
