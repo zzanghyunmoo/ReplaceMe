@@ -78,11 +78,17 @@ if (telemetryOptions.Enabled)
 
 var app = builder.Build();
 
-if (app.Configuration.GetValue("Database:ApplyMigrations", true))
+var runMigrationsOnly = app.Configuration.GetValue("Database:RunMigrationsOnly", false);
+if (app.Configuration.GetValue("Database:ApplyMigrations", true) || runMigrationsOnly)
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<DevAutomationDbContext>();
     await dbContext.Database.MigrateAsync();
+}
+
+if (runMigrationsOnly)
+{
+    return;
 }
 
 app.UseSerilogRequestLogging();

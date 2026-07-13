@@ -42,12 +42,14 @@ docker compose --profile build-only build agent-image
 docker compose up --build api worker postgres kafka
 ```
 
-API는 `http://localhost:8080`에서 실행됩니다. Compose의 `worker` 서비스가 Kafka를
-consume하고 agent job을 실행하며, API service는 HTTP endpoint와 health check를 제공합니다.
-Compose의 `kafka` 서비스는 Redpanda를 Kafka-compatible broker로 실행하므로 애플리케이션
-설정은 기존 `kafka:9092` bootstrap server를 그대로 사용합니다. 에이전트 컨테이너는 같은 Docker
-네트워크(`devautomation-network`)에 붙어 승인 MCP 서버가 PostgreSQL과 notifier
-설정을 사용할 수 있게 구성됩니다.
+API는 `http://localhost:8080`에서 실행됩니다. Compose의 one-shot `migrate`
+서비스가 EF Core migration을 먼저 적용한 뒤 `api`와 `worker`가 시작됩니다.
+`worker` 서비스가 Kafka를 consume하고 agent job을 실행하며, API service는 HTTP
+endpoint와 health check를 제공합니다. Compose의 `kafka` 서비스는 Redpanda를
+Kafka-compatible broker로 실행하므로 애플리케이션 설정은 기존 `kafka:9092`
+bootstrap server를 그대로 사용합니다. 에이전트 컨테이너는 같은 Docker 네트워크
+(`devautomation-network`)에 붙어 승인 MCP 서버가 PostgreSQL과 notifier 설정을
+사용할 수 있게 구성됩니다.
 
 내부 HTTPS proxy 때문에 Docker build에서 NuGet/npm 인증서 오류가 나면 로컬 CA
 인증서(`*.crt`)를 `docker/certs/`에 넣으세요. 이 파일들은 git에는 ignore되지만
@@ -83,7 +85,8 @@ GET /health
 모든 민감값은 `appsettings.json`이 아니라 환경변수 또는 `.env`로 주입합니다.
 
 - `DEVAUTOMATION_Queue__KafkaBootstrapServers`
-- `DEVAUTOMATION_Queue__KafkaConsumerGroupId`
+- `DEVAUTOMATION_Queue__KafkaConsumerGroupId` — 기본 `devautomation-api`
+  (기존 offset 호환용)
 - `DEVAUTOMATION_Agent__RemoteRepositoryProvider` — `GitHub` 또는 `GitLab`
 - `DEVAUTOMATION_Agent__GitHubToken`
 - `DEVAUTOMATION_Agent__GitLabToken`

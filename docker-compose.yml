@@ -12,9 +12,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       DEVAUTOMATION_Telemetry__ServiceName: DevAutomation.Api
+      DEVAUTOMATION_Database__ApplyMigrations: "false"
       DEVAUTOMATION_ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=devautomation;Username=devautomation;Password=devautomation
       DEVAUTOMATION_Queue__KafkaBootstrapServers: kafka:9092
-      DEVAUTOMATION_Queue__KafkaConsumerGroupId: devautomation-worker
       DEVAUTOMATION_Agent__ClaudeImage: devautomation-claude:latest
       DEVAUTOMATION_Agent__DockerNetwork: devautomation-network
       DEVAUTOMATION_Agent__ApprovalMcpCommand: dotnet /app/DevAutomation.ApprovalMcp.dll
@@ -22,8 +22,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./logs:/app/logs
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       kafka:
         condition: service_started
     healthcheck:
@@ -32,6 +32,26 @@ services:
       timeout: 5s
       retries: 12
       start_period: 20s
+    networks:
+      - devautomation
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    image: devautomation-api:local
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DEVAUTOMATION_Database__RunMigrationsOnly: "true"
+      DEVAUTOMATION_ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=devautomation;Username=devautomation;Password=devautomation
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - devautomation
 
@@ -46,9 +66,10 @@ services:
     environment:
       DOTNET_ENVIRONMENT: Development
       DEVAUTOMATION_Telemetry__ServiceName: DevAutomation.Worker
+      DEVAUTOMATION_Database__ApplyMigrations: "false"
       DEVAUTOMATION_ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=devautomation;Username=devautomation;Password=devautomation
       DEVAUTOMATION_Queue__KafkaBootstrapServers: kafka:9092
-      DEVAUTOMATION_Queue__KafkaConsumerGroupId: devautomation-worker
+      DEVAUTOMATION_Queue__KafkaConsumerGroupId: devautomation-api
       DEVAUTOMATION_Agent__ClaudeImage: devautomation-claude:latest
       DEVAUTOMATION_Agent__DockerNetwork: devautomation-network
       DEVAUTOMATION_Agent__ApprovalMcpCommand: dotnet /app/DevAutomation.ApprovalMcp.dll
@@ -56,8 +77,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./logs:/app/logs
     depends_on:
-      api:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       kafka:
         condition: service_started
     networks:

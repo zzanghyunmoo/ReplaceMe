@@ -3,8 +3,9 @@
 ## 무엇을 하는 기능인가
 
 티켓이 생성되면 API가 Kafka topic에 agent job 메시지를 발행합니다.
-별도 `DevAutomation.Worker` process의 `KafkaAgentWorker`가 메시지를 consume하고 `AgentJob.RunAsync(ticketId)`를 실행해
-티켓 상태를 `Running`으로 바꾼 뒤 Docker 컨테이너 하나를 생성합니다. 컨테이너
+별도 `DevAutomation.Worker` process의 `KafkaAgentWorker`가 메시지를 consume하고
+`AgentJob.RunAsync(ticketId)`를 실행해 티켓 상태를 `Running`으로 바꾼 뒤 Docker
+컨테이너 하나를 생성합니다. 컨테이너
 안에서는 설정된 코딩 에이전트 provider가 작업을 수행합니다.
 
 ## 한눈에 보기

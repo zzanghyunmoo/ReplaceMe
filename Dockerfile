@@ -7,7 +7,7 @@ RUN dotnet restore DevAutomation.sln \
     && dotnet publish src/DevAutomation.Api/DevAutomation.Api.csproj -c Release -o /out/api --no-restore \
     && dotnet publish src/DevAutomation.Worker/DevAutomation.Worker.csproj -c Release -o /out/worker --no-restore
 
-FROM mcr.microsoft.com/dotnet/runtime:9.0 AS worker
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS worker
 WORKDIR /app
 COPY --from=build /out/worker ./
 ENTRYPOINT ["dotnet", "DevAutomation.Worker.dll"]

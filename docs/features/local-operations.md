@@ -2,11 +2,12 @@
 
 ## 무엇을 하는 기능인가
 
-ReplaceMe는 Docker Compose로 API, worker, PostgreSQL, Kafka-compatible broker, agent image를 함께 실행할
-수 있게 구성되어 있습니다. Compose의 `api` 서비스는 HTTP endpoint와 health check만 담당하고,
-`worker` 서비스가 Kafka agent job을 consume합니다. Compose의 `kafka` 서비스는 Redpanda를 실행하며,
-애플리케이션은 Kafka API로 접근합니다. `/health` endpoint로 PostgreSQL, broker,
-Docker daemon 연결 상태를 확인합니다.
+ReplaceMe는 Docker Compose로 API, worker, PostgreSQL, Kafka-compatible broker,
+agent image를 함께 실행할 수 있게 구성되어 있습니다. Compose의 `api` 서비스는
+HTTP endpoint와 health check만 담당하고, `worker` 서비스가 Kafka agent job을
+consume합니다. Compose의 `kafka` 서비스는 Redpanda를 실행하며, 애플리케이션은
+Kafka API로 접근합니다. `/health` endpoint로 PostgreSQL, broker, Docker daemon
+연결 상태를 확인합니다.
 
 ## 한눈에 보기
 
@@ -22,11 +23,13 @@ Docker daemon 연결 상태를 확인합니다.
 
 ```mermaid
 flowchart LR
-    Compose[docker-compose.yml] --> API[api\nASP.NET Core HTTP]
+    Compose[docker-compose.yml] --> Migrate[migrate\nEF Core migrations]
+    Compose --> API[api\nASP.NET Core HTTP]
     Compose --> Worker[worker\nKafkaAgentWorker]
     Compose --> Postgres[(postgres\nticket / approval / logs)]
     Compose --> Kafka[(kafka service\nRedpanda broker)]
     Compose --> AgentImage[agent-image\nClaude Code + Approval MCP]
+    Migrate --> Postgres
     API --> Postgres
     API --> Kafka
     Worker --> Postgres
@@ -44,6 +47,10 @@ cp .env.example .env
 docker compose --profile build-only build agent-image
 docker compose up --build api worker postgres kafka
 ```
+
+`api`와 `worker`는 `migrate` one-shot service가 EF Core migration을 끝낸 뒤
+시작합니다. `docker compose up --build api worker postgres kafka`를 실행하면
+`migrate`는 dependency로 자동 실행됩니다.
 
 API는 기본적으로 다음 주소에서 열립니다.
 
@@ -65,7 +72,7 @@ Dockerfiles가 build 시 image trust store에 추가합니다.
 | 환경변수 | 설명 |
 | --- | --- |
 | `DEVAUTOMATION_Queue__KafkaBootstrapServers` | API/worker가 사용할 Kafka API broker |
-| `DEVAUTOMATION_Queue__KafkaConsumerGroupId` | worker consumer group, 기본 `devautomation-worker` |
+| `DEVAUTOMATION_Queue__KafkaConsumerGroupId` | worker consumer group, 기본 `devautomation-api`(기존 offset 호환용) |
 | `DEVAUTOMATION_Agent__AnthropicApiKey` | agent container에 주입할 Anthropic API key |
 | `DEVAUTOMATION_Agent__RemoteRepositoryProvider` | `GitHub` 또는 `GitLab` |
 | `DEVAUTOMATION_Agent__GitHubToken` | GitHub push/PR 생성 token |
@@ -160,5 +167,7 @@ docker run --rm -v "$PWD":/src -w /src \
 ## 현재 한계
 
 - production deployment manifest는 아직 없습니다.
-- Docker socket mount는 로컬 개발용이며, 운영에서는 별도 격리가 필요합니다.
+- Docker socket mount는 로컬 개발용이며, 운영에서는 별도 격리가 필요합니다. 현재 API도
+  cancellation과 Docker health check 때문에 socket을 공유하며, worker-only Docker control
+  전환은 ZZA-64에서 다룹니다.
 - Kafka poison message DLQ와 재시도 정책은 아직 없습니다.
