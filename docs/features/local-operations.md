@@ -2,8 +2,9 @@
 
 ## 무엇을 하는 기능인가
 
-ReplaceMe는 Docker Compose로 API, PostgreSQL, Kafka-compatible broker, agent image를 함께 실행할
-수 있게 구성되어 있습니다. Compose의 `kafka` 서비스는 Redpanda를 실행하며,
+ReplaceMe는 Docker Compose로 API, worker, PostgreSQL, Kafka-compatible broker, agent image를 함께 실행할
+수 있게 구성되어 있습니다. Compose의 `api` 서비스는 HTTP endpoint와 health check만 담당하고,
+`worker` 서비스가 Kafka agent job을 consume합니다. Compose의 `kafka` 서비스는 Redpanda를 실행하며,
 애플리케이션은 Kafka API로 접근합니다. `/health` endpoint로 PostgreSQL, broker,
 Docker daemon 연결 상태를 확인합니다.
 
@@ -12,7 +13,7 @@ Docker daemon 연결 상태를 확인합니다.
 | 항목 | 내용 |
 | --- | --- |
 | 시작 조건 | `.env`를 준비하고 Docker Compose를 실행합니다. |
-| 핵심 책임 | 로컬 API, DB, Kafka-compatible broker, agent image를 함께 띄웁니다. |
+| 핵심 책임 | 로컬 API, worker, DB, Kafka-compatible broker, agent image를 함께 띄웁니다. |
 | 주요 확인 | `/health`, compose container 상태, test 명령입니다. |
 | 실패 시 | DB/broker/Docker 연결 문제를 먼저 확인합니다. |
 | ZZA-51 이후 | `/health`와 별도로 profile readiness endpoint가 추가될 예정입니다. |
@@ -21,13 +22,16 @@ Docker daemon 연결 상태를 확인합니다.
 
 ```mermaid
 flowchart LR
-    Compose[docker-compose.yml] --> API[api\nASP.NET Core + Kafka worker]
+    Compose[docker-compose.yml] --> API[api\nASP.NET Core HTTP]
+    Compose --> Worker[worker\nKafkaAgentWorker]
     Compose --> Postgres[(postgres\nticket / approval / logs)]
     Compose --> Kafka[(kafka service\nRedpanda broker)]
     Compose --> AgentImage[agent-image\nClaude Code + Approval MCP]
     API --> Postgres
     API --> Kafka
-    API --> DockerSock[/Docker socket/]
+    Worker --> Postgres
+    Worker --> Kafka
+    Worker --> DockerSock[/Docker socket/]
     DockerSock --> AgentImage
 ```
 
@@ -38,7 +42,7 @@ cp .env.example .env
 # .env에 Anthropic/GitHub 또는 GitLab, notifier, issue tracker, document tool 값을 입력
 
 docker compose --profile build-only build agent-image
-docker compose up --build api postgres kafka
+docker compose up --build api worker postgres kafka
 ```
 
 API는 기본적으로 다음 주소에서 열립니다.
@@ -61,6 +65,7 @@ Dockerfiles가 build 시 image trust store에 추가합니다.
 | 환경변수 | 설명 |
 | --- | --- |
 | `DEVAUTOMATION_Queue__KafkaBootstrapServers` | API/worker가 사용할 Kafka API broker |
+| `DEVAUTOMATION_Queue__KafkaConsumerGroupId` | worker consumer group, 기본 `devautomation-worker` |
 | `DEVAUTOMATION_Agent__AnthropicApiKey` | agent container에 주입할 Anthropic API key |
 | `DEVAUTOMATION_Agent__RemoteRepositoryProvider` | `GitHub` 또는 `GitLab` |
 | `DEVAUTOMATION_Agent__GitHubToken` | GitHub push/PR 생성 token |
@@ -145,10 +150,11 @@ docker run --rm -v "$PWD":/src -w /src \
 ## 코드 위치
 
 - Compose: `docker-compose.yml`
-- API image: `Dockerfile`
+- API/worker image targets: `Dockerfile`
 - Agent image: `Dockerfile.agent`
 - 설정: `src/DevAutomation.Api/appsettings.json`, `.env.example`
-- Health endpoint: `src/DevAutomation.Api/Program.cs`
+- API endpoints and health endpoint: `src/DevAutomation.Api/Program.cs`
+- Worker host: `src/DevAutomation.Worker/Program.cs`
 - Kafka producer/consumer: `src/DevAutomation.Infrastructure/Queues/`
 
 ## 현재 한계

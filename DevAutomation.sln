@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DevAutomation.ApprovalMcp",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DevAutomation.Tests", "tests\DevAutomation.Tests\DevAutomation.Tests.csproj", "{CF56DCF1-DE40-443B-9A64-EF9877AD6004}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DevAutomation.Worker", "src\DevAutomation.Worker\DevAutomation.Worker.csproj", "{FCD18A6C-BB7A-4E4D-92ED-363BA179C1DC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -85,6 +87,18 @@ Global
 		{CF56DCF1-DE40-443B-9A64-EF9877AD6004}.Release|x64.Build.0 = Release|Any CPU
 		{CF56DCF1-DE40-443B-9A64-EF9877AD6004}.Release|x86.ActiveCfg = Release|Any CPU
 		{CF56DCF1-DE40-443B-9A64-EF9877AD6004}.Release|x86.Build.0 = Release|Any CPU
+		{FCD18A6C-BB7A-4E4D-92ED-363BA179C1DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FCD18A6C-BB7A-4E4D-92ED-363BA179C1DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FCD18A6C-BB7A-4E4D-92ED-363BA179C1DC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FCD18A6C-BB7A-4E4D-92ED-363BA179C1DC}.Debug|x64.Build.0 = Debug|Any CPU
+		{FCD18A6C-BB7A-4E4D-92ED-363BA179C1DC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FCD18A6C-BB7A-4E4D-92ED-363BA179C1DC}.Debug|x86.Build.0 = Debug|Any CPU
+		{FCD18A6C-BB7A-4E4D-92ED-363BA179C1DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FCD18A6C-BB7A-4E4D-92ED-363BA179C1DC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FCD18A6C-BB7A-4E4D-92ED-363BA179C1DC}.Release|x64.ActiveCfg = Release|Any CPU
+		{FCD18A6C-BB7A-4E4D-92ED-363BA179C1DC}.Release|x64.Build.0 = Release|Any CPU
+		{FCD18A6C-BB7A-4E4D-92ED-363BA179C1DC}.Release|x86.ActiveCfg = Release|Any CPU
+		{FCD18A6C-BB7A-4E4D-92ED-363BA179C1DC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -95,5 +109,6 @@ Global
 		{B5C71871-1C82-4DCE-8AE4-04E074F0DF6F} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{52B11C38-5CC6-4722-9665-2637422F1DAF} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{CF56DCF1-DE40-443B-9A64-EF9877AD6004} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{FCD18A6C-BB7A-4E4D-92ED-363BA179C1DC} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

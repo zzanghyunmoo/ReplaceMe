@@ -9,7 +9,6 @@ using DevAutomation.Core.Services;
 using DevAutomation.Core.Readiness;
 using DevAutomation.Infrastructure.DependencyInjection;
 using DevAutomation.Infrastructure.Persistence;
-using DevAutomation.Infrastructure.Queues;
 using DevAutomation.Infrastructure.Slack;
 using DevAutomation.Infrastructure.Telemetry;
 using Microsoft.AspNetCore.WebUtilities;
@@ -35,7 +34,6 @@ builder.Host.UseSerilog();
 
 builder.Services.AddDevAutomationCore(builder.Configuration);
 builder.Services.AddDevAutomationInfrastructure(builder.Configuration);
-builder.Services.AddHostedService<KafkaAgentWorker>();
 builder.Services.AddEndpointsApiExplorer();
 
 var telemetryOptions = builder.Configuration.GetSection(TelemetryOptions.SectionName).Get<TelemetryOptions>() ?? new TelemetryOptions();

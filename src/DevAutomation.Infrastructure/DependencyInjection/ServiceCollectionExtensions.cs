@@ -17,6 +17,7 @@ using DevAutomation.Infrastructure.RemoteRepositories;
 using DevAutomation.Infrastructure.Slack;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace DevAutomation.Infrastructure.DependencyInjection;
 
@@ -44,6 +45,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<TicketStateMachine>();
         services.AddScoped<ApprovalService>();
+        return services;
+    }
+
+    public static IServiceCollection AddDevAutomationAgentWorker(this IServiceCollection services)
+    {
+        services.AddHostedService<KafkaAgentWorker>();
         return services;
     }
 
