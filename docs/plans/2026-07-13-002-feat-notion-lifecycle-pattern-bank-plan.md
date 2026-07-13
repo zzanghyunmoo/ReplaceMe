@@ -9,9 +9,9 @@ product_contract_source: linear-zza-52
 execution: design
 ---
 
-# Notion Lifecycle Documents and Pattern Bank - Plan
-
 <!-- markdownlint-disable MD013 MD025 MD036 -->
+
+# Notion Lifecycle Documents and Pattern Bank - Plan
 
 ## Goal Capsule
 
