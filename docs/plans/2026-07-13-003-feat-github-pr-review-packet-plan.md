@@ -9,9 +9,9 @@ product_contract_source: ce-plan-bootstrap
 execution: design
 ---
 
-# GitHub PR Review Packet - Plan
-
 <!-- markdownlint-disable MD013 MD025 MD036 -->
+
+# GitHub PR Review Packet - Plan
 
 ## Goal Capsule
 
