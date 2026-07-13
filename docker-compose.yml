@@ -22,6 +22,10 @@ services:
       DEVAUTOMATION_Queue__MaxAttempts: "3"
       DEVAUTOMATION_Agent__ClaudeImage: devautomation-claude:latest
       DEVAUTOMATION_Agent__DockerNetwork: devautomation-network
+      DEVAUTOMATION_Agent__ExecutionIsolationProfile: LocalDevelopment
+      DEVAUTOMATION_Agent__DockerSocketMode: LocalDockerSocket
+      DEVAUTOMATION_Agent__AllowLocalDockerSocket: "true"
+      DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike: "false"
       DEVAUTOMATION_Agent__ApprovalMcpCommand: dotnet /app/DevAutomation.ApprovalMcp.dll
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -82,6 +86,10 @@ services:
       DEVAUTOMATION_Queue__MaxAttempts: "3"
       DEVAUTOMATION_Agent__ClaudeImage: devautomation-claude:latest
       DEVAUTOMATION_Agent__DockerNetwork: devautomation-network
+      DEVAUTOMATION_Agent__ExecutionIsolationProfile: LocalDevelopment
+      DEVAUTOMATION_Agent__DockerSocketMode: LocalDockerSocket
+      DEVAUTOMATION_Agent__AllowLocalDockerSocket: "true"
+      DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike: "false"
       DEVAUTOMATION_Agent__ApprovalMcpCommand: dotnet /app/DevAutomation.ApprovalMcp.dll
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

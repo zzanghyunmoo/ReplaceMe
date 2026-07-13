@@ -52,6 +52,7 @@ flowchart TD
 | `local.postgres.connectivity` | required | PostgreSQL 연결 가능 여부 |
 | `local.kafka.connectivity` | required | Kafka broker metadata 조회 가능 여부 |
 | `local.docker.ping` | required | Docker daemon 접근 가능 여부 |
+| `agent.docker.socket.posture` | required/warning | local Docker socket opt-in posture |
 | `agent.image.available` | required | configured agent image 존재 여부 |
 | `github.agent.gh.capability` | required | GitHub token, repo config, agent image 안의 `git`/`gh` 명령 |
 | `linear.read.access` | required | Linear team/project/readiness issue read access |
@@ -86,6 +87,24 @@ flowchart TD
 | `DEVAUTOMATION_ProfileReadiness__Publishers__LinearSeverity` | Linear publisher 실패 severity입니다. |
 | `DEVAUTOMATION_ProfileReadiness__Publishers__NotionSeverity` | Notion publisher 실패 severity입니다. |
 | `DEVAUTOMATION_ProfileReadiness__Checks__SecretsRedactionSeverity` | secret redaction gap severity입니다. |
+| `DEVAUTOMATION_Agent__ExecutionIsolationProfile` | `LocalDevelopment` 또는 `ProductionLike`입니다. |
+| `DEVAUTOMATION_Agent__DockerSocketMode` | 현재 local runner는 `LocalDockerSocket`입니다. |
+| `DEVAUTOMATION_Agent__AllowLocalDockerSocket` | local socket runner의 명시적 opt-in입니다. |
+| `DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike` | production-like 예외 opt-in입니다. |
+
+## Docker socket posture
+
+Local Docker socket mode는 Docker Desktop/Compose 기반 개발을 위한 local-only runner입니다.
+Readiness는 다음처럼 판단합니다.
+
+- `AllowLocalDockerSocket=false`이면 local runner가 명시적으로 허용되지 않았으므로
+  required failure입니다.
+- `ExecutionIsolationProfile=LocalDevelopment`이고 opt-in이 있으면 runnable이지만 warning을
+  남겨 shared 환경 재사용을 막습니다.
+- `ExecutionIsolationProfile=ProductionLike`, `ASPNETCORE_ENVIRONMENT=Production`, 또는
+  `DOTNET_ENVIRONMENT=Production` 계열에서 production-like opt-in이 없으면 required
+  failure입니다.
+- production-like opt-in이 있어도 warning으로 남기며, 별도 격리 runner로 이전해야 합니다.
 
 ## 코드 위치
 

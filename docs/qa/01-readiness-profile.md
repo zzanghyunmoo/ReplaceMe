@@ -32,10 +32,14 @@ DEVAUTOMATION_Notion__ApiToken=<Notion integration token>
 DEVAUTOMATION_ProfileReadiness__Notion__SetupPageId=<Notion setup page id>
 ```
 
-pre-run gate까지 확인하려면 다음도 설정합니다.
+pre-run gate와 local Docker socket posture까지 확인하려면 다음도 설정합니다.
 
 ```env
 DEVAUTOMATION_ProfileReadiness__SelectedProfile=personal-github-linear-notion
+DEVAUTOMATION_Agent__ExecutionIsolationProfile=LocalDevelopment
+DEVAUTOMATION_Agent__DockerSocketMode=LocalDockerSocket
+DEVAUTOMATION_Agent__AllowLocalDockerSocket=true
+DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike=false
 ```
 
 주의: `POST /doctor`와 failed pre-run gate는 설정된 Linear/Notion target에 실제 report를
@@ -199,10 +203,48 @@ echo "kafka offset: $READY_BEFORE_OFFSET -> $READY_AFTER_OFFSET"
 - `ticket count`가 증가하지 않습니다.
 - `kafka offset`이 증가하지 않습니다.
 
-## READY-008. Secret redaction gap은 warning으로 보인다
+## READY-008. Docker socket posture가 local-only warning으로 보인다
 
-Notion token 등 secret catalog에 아직 포함되지 않은 값이 있으면 redaction coverage check가
-warning을 낼 수 있습니다.
+local Compose 기본값으로 readiness를 조회합니다.
+
+```bash
+curl -s "$BASE_URL/api/readiness/profiles/personal-github-linear-notion" \
+  | jq '.checks[] | select(.id == "agent.docker.socket.posture")'
+```
+
+기대 결과:
+
+- `status=Warning`입니다.
+- summary가 local Docker socket mode가 trusted local development 전용임을 설명합니다.
+- `isRunnable`은 이 warning만으로는 막히지 않습니다.
+
+## READY-009. Production-like Docker socket posture는 opt-in 없이는 차단된다
+
+API 또는 worker를 다음처럼 production-like posture로 재시작합니다.
+
+```env
+DEVAUTOMATION_Agent__ExecutionIsolationProfile=ProductionLike
+DEVAUTOMATION_Agent__DockerSocketMode=LocalDockerSocket
+DEVAUTOMATION_Agent__AllowLocalDockerSocket=true
+DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike=false
+```
+
+```bash
+curl -s "$BASE_URL/api/readiness/profiles/personal-github-linear-notion" \
+  | jq '.isRunnable, .checks[] | select(.id == "agent.docker.socket.posture")'
+```
+
+기대 결과:
+
+- `agent.docker.socket.posture`가 `status=Failed`, `severity=Required`입니다.
+- `isRunnable=false`입니다.
+- repair hint가 isolated runner 또는 명시적 production-like 예외 opt-in을 안내합니다.
+
+## READY-010. Secret redaction gap은 warning으로 보인다
+
+Secret catalog에 포함되지 않은 값이 있으면 redaction coverage check가 warning을 낼 수
+있습니다. Anthropic, GitHub/GitLab, Slack, Jira, Linear, Gmail, Notion, Confluence,
+Langfuse, LiteLLM secret은 catalog에 포함되어야 합니다.
 
 ```bash
 curl -s "$BASE_URL/api/readiness/profiles/personal-github-linear-notion" \
@@ -224,6 +266,8 @@ curl -s "$BASE_URL/api/readiness/profiles/personal-github-linear-notion" \
 - [ ] agent image 내부 `git`/`gh` 확인
 - [ ] POST doctor가 Linear/Notion QA target에 report 작성
 - [ ] pre-run gate가 불완전한 환경에서 `409`로 ticket 생성을 차단
-- [ ] secret 값이 응답/로그에 원문으로 노출되지 않음
+- [ ] local Docker socket posture가 warning으로 보임
+- [ ] production-like local Docker socket posture가 opt-in 없이는 required failure가 됨
+- [ ] Langfuse/LiteLLM 포함 secret 값이 응답/로그에 원문으로 노출되지 않음
 
 <!-- markdownlint-enable MD013 -->

@@ -68,6 +68,10 @@ flowchart TD
 | `Agent:AgentTimeout` | `00:30:00` | 티켓당 최대 실행 시간 |
 | `Agent:ClaudeImage` | `devautomation-claude:latest` | agent container image |
 | `Agent:RemoteRepositoryProvider` | `GitHub` | `GitHub` 또는 `GitLab` |
+| `Agent:ExecutionIsolationProfile` | `LocalDevelopment` | `LocalDevelopment` 또는 `ProductionLike` |
+| `Agent:DockerSocketMode` | `LocalDockerSocket` | host Docker socket runner 사용 여부 |
+| `Agent:AllowLocalDockerSocket` | `true` in local config | local socket runner 명시적 opt-in |
+| `Agent:AllowLocalDockerSocketInProductionLike` | `false` | production-like 예외 opt-in |
 | `CodingAgent:Provider` | `ClaudeCode` | 코딩 에이전트 provider |
 <!-- markdownlint-enable MD013 -->
 
@@ -78,8 +82,8 @@ flowchart TD
 - JSON line이면 `type` 필드를 event type으로 사용합니다.
 - plain text면 `stdout` event로 저장합니다.
 - `SecretRedactor`가 secret catalog에 등록된 Anthropic, GitHub, GitLab,
-  PostgreSQL connection string, Slack, Jira, Linear, Gmail, Notion, Confluence 관련
-  secret 값을 `[REDACTED]`로 치환합니다.
+  PostgreSQL connection string, Slack, Jira, Linear, Gmail, Notion, Confluence,
+  Langfuse, LiteLLM 관련 secret 값을 `[REDACTED]`로 치환합니다.
 - readiness profile의 `secrets.redaction.coverage` check가 catalog coverage를
   계속 점검합니다.
 - `AgentJob`은 로그를 25개씩 buffer 후 DB에 저장합니다.
@@ -94,6 +98,24 @@ flowchart TD
 - Coding agent providers: `src/DevAutomation.Infrastructure/CodingAgents/`
 - stream-json parser: `src/DevAutomation.Infrastructure/Agents/ClaudeStreamParser.cs`
 - secret redaction: `src/DevAutomation.Infrastructure/Agents/SecretRedactor.cs`
+
+## 실행 격리와 secret 경계
+
+현재 runner는 host Docker socket을 사용해 agent container를 만듭니다. 이 방식은
+trusted local development 전용입니다. `Agent:AllowLocalDockerSocket=true`로 명시적으로
+켜야 하며, `Agent:ExecutionIsolationProfile=ProductionLike` 또는 Production/Staging
+환경에서는 `Agent:AllowLocalDockerSocketInProductionLike=true`가 없으면 readiness와
+runner가 실행을 차단합니다.
+
+Production-like 예외 opt-in은 임시 break-glass 용도입니다. shared/production-like
+환경은 host Docker socket 대신 별도 격리 runner로 이전해야 합니다.
+
+Agent container 환경변수는 명시적 allowlist로 제한합니다. 현재 allowlist는 ticket/git
+metadata, 선택된 coding agent secret, 선택된 remote repository provider secret, 그리고
+Approval MCP 실행에 필요한 PostgreSQL/Slack runtime 값입니다. 예를 들어 GitHub provider는
+`GITHUB_TOKEN`만, GitLab provider는 `GITLAB_TOKEN`만 주입합니다. Langfuse observability
+secret과 LiteLLM gateway secret은 redaction catalog에 포함되지만, 해당 통합이 명시적으로
+구현되기 전에는 agent container에 주입하지 않습니다.
 
 ## 확인 방법
 
@@ -131,6 +153,6 @@ docker compose up --build api worker postgres kafka
 
 - Kafka retry/DLQ는 worker 처리 예외와 poison message를 bounded 처리합니다. agent가 정상 실행되어
   실패 결과를 반환한 경우에는 기존처럼 ticket failure로 종료합니다.
-- 컨테이너 권한, network policy, Docker socket 접근 제한은 운영 환경에서
-  별도 hardening이 필요합니다.
+- local Docker socket runner는 명시적 opt-in, readiness 경고/차단, runner 실행 전 guard로
+  보호하지만 운영 등급 격리 runner 자체는 아직 없습니다.
 - Gmail notifier는 Gmail API access token 갱신을 자체 처리하지 않습니다.
