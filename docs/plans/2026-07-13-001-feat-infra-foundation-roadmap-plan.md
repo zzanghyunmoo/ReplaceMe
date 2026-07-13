@@ -34,7 +34,7 @@ The work keeps the current .NET API, PostgreSQL, Redpanda/Kafka, Docker agent ru
 ### Problem Frame
 
 At roadmap creation, ReplaceMe ran the Minimal API and `KafkaAgentWorker` in the same host. As of 2026-07-13, U1 is merged: `DevAutomation.Api` and `DevAutomation.Worker` now run as separate Compose services with a `migrate` one-shot service applying EF Core migrations first. ReplaceMe still persists tickets and execution logs to PostgreSQL, uses Redpanda as a Kafka-compatible broker, and launches Claude Code in Docker containers through `DockerAgentRunner`.
-The app already has OpenTelemetry hooks, Serilog file logs, a readiness profile, and secret redaction, but the compose stack has no OTLP collector or observability backend, Kafka jobs have no bounded retry/DLQ path, and the local runner mounts the host Docker socket.
+As of 2026-07-13, U2/U3/U6 are also merged: Kafka processing failures now have bounded retry/DLQ handling, the local compose stack has an optional OTel Collector/Jaeger/Prometheus observability profile, and local Docker socket execution is guarded by readiness plus runner-level production-like checks. The remaining roadmap focus is AI-run observability, LiteLLM compatibility, and follow-up workflow grammar.
 Langfuse is the right first AI-observability layer because the product's core questions are run quality, prompt/model cost, latency, failure cause, and approval handoff timing.
 LiteLLM is promising as a gateway, but it should remain a spike until Claude Code proxy compatibility, virtual-key delivery, and trace/cost routing are proven.
 
@@ -173,19 +173,19 @@ flowchart LR
 | Unit | Issue | Priority | Status | Intent |
 | --- | --- | --- | --- | --- |
 | U1 | [ZZA-59](https://linear.app/zzanghyunmoo/issue/ZZA-59/api와-worker-런타임-분리) | Medium | Done | API and worker runtime split. |
-| U2 | [ZZA-61](https://linear.app/zzanghyunmoo/issue/ZZA-61/kafka-재시도와-dlq-처리-추가) | High | Next | Kafka retry and DLQ behavior. |
-| U3 | [ZZA-62](https://linear.app/zzanghyunmoo/issue/ZZA-62/opentelemetry-collector-기반-로컬-관측성-프로필-추가) | Medium | Next | OTel Collector local observability profile. |
-| U4 | [ZZA-60](https://linear.app/zzanghyunmoo/issue/ZZA-60/langfuse-ai-실행-trace-연동) | Medium | Blocked by U2/U3/U6 | Langfuse AI-run tracing. |
+| U2 | [ZZA-61](https://linear.app/zzanghyunmoo/issue/ZZA-61/kafka-재시도와-dlq-처리-추가) | High | Done | Kafka retry and DLQ behavior. |
+| U3 | [ZZA-62](https://linear.app/zzanghyunmoo/issue/ZZA-62/opentelemetry-collector-기반-로컬-관측성-프로필-추가) | Medium | Done | OTel Collector local observability profile. |
+| U4 | [ZZA-60](https://linear.app/zzanghyunmoo/issue/ZZA-60/langfuse-ai-실행-trace-연동) | Medium | Ready after U2/U3/U6 | Langfuse AI-run tracing. |
 | U5 | [ZZA-63](https://linear.app/zzanghyunmoo/issue/ZZA-63/litellm-proxy-호환성-spike) | Low | Spike after U4 baseline | LiteLLM proxy compatibility spike. |
-| U6 | [ZZA-64](https://linear.app/zzanghyunmoo/issue/ZZA-64/agent-실행-격리와-secret-경계-hardening) | High | Next | Agent isolation and secret boundary hardening. |
+| U6 | [ZZA-64](https://linear.app/zzanghyunmoo/issue/ZZA-64/agent-실행-격리와-secret-경계-hardening) | High | Done | Agent isolation and secret boundary hardening. |
 
 | Existing issue | Relationship to this plan | Execution guidance |
 | --- | --- | --- |
 | [ZZA-58](https://linear.app/zzanghyunmoo/issue/ZZA-58/replaceme-net-9-로컬-빌드-경로-정렬) | Historical precondition for U1. | No longer blocking after ZZA-59 merge. |
-| [ZZA-52](https://linear.app/zzanghyunmoo/issue/ZZA-52/notion-작업-문서와-패턴-뱅크-설계) | Consumes Run Passport v0 and later Langfuse evidence. | Design plan is done; automation hooks can now build on the merged API/worker split, but should still wait for retry/DLQ when background publishing is automatic. |
+| [ZZA-52](https://linear.app/zzanghyunmoo/issue/ZZA-52/notion-작업-문서와-패턴-뱅크-설계) | Consumes Run Passport v0 and later Langfuse evidence. | Design plan is done; API/worker split and retry/DLQ are now available, so automation hooks should next focus on idempotency, persistence, and redaction safety. |
 | [ZZA-55](https://linear.app/zzanghyunmoo/issue/ZZA-55/github-pr-리뷰-패킷-설계) | Consumes ZZA-52 links and Run Passport v0. | Design plan is done; optionally enrich after ZZA-60. |
-| [ZZA-53](https://linear.app/zzanghyunmoo/issue/ZZA-53/linear-이슈-실행-지시서-설계) | Top-level execution workflow. | Start after ZZA-59, ZZA-61, ZZA-64, ZZA-52, and ZZA-55. |
-| [ZZA-54](https://linear.app/zzanghyunmoo/issue/ZZA-54/provider-doctor와-로컬-안전문-설계) | Mostly covered by ZZA-51 and U6 hardening. | Recheck after ZZA-64; close if duplicate or redefine remaining scope. |
+| [ZZA-53](https://linear.app/zzanghyunmoo/issue/ZZA-53/linear-이슈-실행-지시서-설계) | Top-level execution workflow. | Start next after the merged infrastructure foundation and ZZA-52/ZZA-55 design contracts. |
+| [ZZA-54](https://linear.app/zzanghyunmoo/issue/ZZA-54/provider-doctor와-로컬-안전문-설계) | Mostly covered by ZZA-51 and U6 hardening. | Close as duplicate or redefine only the provider-doctor leftovers not covered by readiness and agent hardening. |
 
 ### Assumptions
 

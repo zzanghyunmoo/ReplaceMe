@@ -12,6 +12,12 @@ using Microsoft.Extensions.Options;
 
 namespace DevAutomation.Infrastructure.Agents;
 
+public enum AgentJobFailureHandling
+{
+    FailTicket,
+    ResetToPendingAndRethrow
+}
+
 public sealed class AgentJob
 {
     private readonly DevAutomationDbContext _dbContext;
@@ -46,7 +52,7 @@ public sealed class AgentJob
         _logger = logger;
     }
 
-    public async Task RunAsync(Guid ticketId, bool deferUnhandledFailureToQueue = false)
+    public async Task RunAsync(Guid ticketId, AgentJobFailureHandling failureHandling = AgentJobFailureHandling.FailTicket)
     {
         using var activity = DevAutomationTelemetry.ActivitySource.StartActivity("AgentJob.Run", ActivityKind.Internal);
         activity?.SetTag("ticket.id", ticketId);
@@ -155,7 +161,8 @@ public sealed class AgentJob
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             DevAutomationTelemetry.AgentJobsFailed.Add(1, new KeyValuePair<string, object?>("agent.result", "exception"));
 
-            if (deferUnhandledFailureToQueue && ticket.Status is TicketStatus.Pending or TicketStatus.Running or TicketStatus.WaitingApproval)
+            if (failureHandling == AgentJobFailureHandling.ResetToPendingAndRethrow
+                && ticket.Status is TicketStatus.Pending or TicketStatus.Running or TicketStatus.WaitingApproval)
             {
                 _stateMachine.MarkPendingRetry(ticket);
                 await _dbContext.SaveChangesAsync(CancellationToken.None);
