@@ -247,6 +247,35 @@ grep -R -E "(ghp_|github_pat_|glpat-|sk-ant-|xox[baprs]-|xapp-)" logs \
 이 케이스는 readiness profile의 실제 required check 구성에 의존합니다. 로컬 환경이 이미
 runnable이면 의도적으로 credential을 비운 별도 `.env`나 테스트 profile을 사용합니다.
 
+## AGENT-008. Kafka retry/DLQ 설정과 poison message 확인
+
+worker는 agent job message 본문에 `Attempt`, `LastFailureReason`, `LastFailedAt`를 저장합니다.
+`Queue:MaxAttempts` 이상 실패한 worker 처리 예외 또는 parsing할 수 없는 poison message는
+`Queue:KafkaDlqTopic`(기본 `devautomation.agent-jobs.dlq`)으로 이동합니다.
+
+가벼운 설정 검증:
+
+```bash
+docker compose config --quiet
+```
+
+Redpanda가 떠 있는 환경에서 poison message DLQ 동작을 수동 확인하려면 다음처럼 잘못된
+payload를 agent job topic에 넣고 DLQ topic에서 소비합니다.
+
+```bash
+docker compose exec kafka rpk topic produce devautomation.agent-jobs <<'EOF'
+not-json
+EOF
+
+docker compose exec kafka rpk topic consume devautomation.agent-jobs.dlq -n 1
+```
+
+기대 결과:
+
+- worker log에 invalid Kafka queue message가 DLQ로 publish됐다는 warning이 남습니다.
+- DLQ payload에는 source topic/partition/offset, sanitized original value, failure reason이 있습니다.
+- DLQ publish가 실패하면 worker는 원본 offset을 commit하지 않고 reconnect loop에서 다시 시도합니다.
+
 ## 완료 체크리스트
 
 - [ ] agent image build/inspect 성공
@@ -257,5 +286,6 @@ runnable이면 의도적으로 credential을 비운 별도 `.env`나 테스트 p
 - [ ] 성공 ticket에 `prUrl` 저장
 - [ ] execution log에 secret 원문 노출 없음
 - [ ] worker를 나중에 시작하는 방식으로 readiness safety net이 agent container 생성 전에 차단함을 확인
+- [ ] poison message가 `devautomation.agent-jobs.dlq`에 sanitized context와 함께 들어감
 
 <!-- markdownlint-enable MD013 -->

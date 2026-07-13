@@ -42,6 +42,40 @@ public sealed class AgentJobReplayTests
         Assert.Equal(0, runner.RunCount);
     }
 
+    [Fact]
+    public async Task RunAsync_WhenQueueRetryDefersUnhandledFailure_ResetsTicketToPendingAndRethrows()
+    {
+        await using var dbContext = CreateDbContext();
+        var ticket = Ticket.Create(
+            "Retry transient failure",
+            "Throw once so Kafka retry can own the retry/DLQ decision.",
+            "https://example.test/repo.git",
+            "main",
+            DateTimeOffset.Parse("2026-07-13T00:00:00Z"));
+        await dbContext.Tickets.AddAsync(ticket);
+        await dbContext.SaveChangesAsync();
+        var runner = new ThrowingAgentRunner();
+        var job = new AgentJob(
+            dbContext,
+            runner,
+            new NoOpTicketNotifier(),
+            new NoOpIssueTrackerService(),
+            new RunnableReadinessService(),
+            Options.Create(new ProfileReadinessOptions()),
+            new FixedClock(DateTimeOffset.Parse("2026-07-13T00:00:00Z")),
+            new TicketStateMachine(),
+            NullLogger<AgentJob>.Instance);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => job.RunAsync(ticket.Id, deferUnhandledFailureToQueue: true));
+
+        var saved = await dbContext.Tickets.SingleAsync(x => x.Id == ticket.Id);
+        Assert.Equal("transient agent exception", exception.Message);
+        Assert.Equal(TicketStatus.Pending, saved.Status);
+        Assert.Null(saved.ContainerId);
+        Assert.Null(saved.FailReason);
+        Assert.Equal(1, runner.RunCount);
+    }
+
     private static DevAutomationDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<DevAutomationDbContext>()
@@ -85,6 +119,23 @@ public sealed class AgentJobReplayTests
         {
             RunCount++;
             return Task.FromResult(new AgentRunResult(true, "https://github.test/pull/1", null));
+        }
+
+        public Task StopAsync(Guid ticketId, string? containerId, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class ThrowingAgentRunner : IAgentRunner
+    {
+        public int RunCount { get; private set; }
+
+        public Task<AgentRunResult> RunAsync(
+            Ticket ticket,
+            Func<string, CancellationToken, Task> onContainerStarted,
+            Func<AgentLogEvent, CancellationToken, Task> onLog,
+            CancellationToken cancellationToken)
+        {
+            RunCount++;
+            throw new InvalidOperationException("transient agent exception");
         }
 
         public Task StopAsync(Guid ticketId, string? containerId, CancellationToken cancellationToken) => Task.CompletedTask;

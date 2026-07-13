@@ -15,6 +15,8 @@ services:
       DEVAUTOMATION_Database__ApplyMigrations: "false"
       DEVAUTOMATION_ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=devautomation;Username=devautomation;Password=devautomation
       DEVAUTOMATION_Queue__KafkaBootstrapServers: kafka:9092
+      DEVAUTOMATION_Queue__KafkaDlqTopic: devautomation.agent-jobs.dlq
+      DEVAUTOMATION_Queue__MaxAttempts: "3"
       DEVAUTOMATION_Agent__ClaudeImage: devautomation-claude:latest
       DEVAUTOMATION_Agent__DockerNetwork: devautomation-network
       DEVAUTOMATION_Agent__ApprovalMcpCommand: dotnet /app/DevAutomation.ApprovalMcp.dll
@@ -70,6 +72,8 @@ services:
       DEVAUTOMATION_ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=devautomation;Username=devautomation;Password=devautomation
       DEVAUTOMATION_Queue__KafkaBootstrapServers: kafka:9092
       DEVAUTOMATION_Queue__KafkaConsumerGroupId: devautomation-api
+      DEVAUTOMATION_Queue__KafkaDlqTopic: devautomation.agent-jobs.dlq
+      DEVAUTOMATION_Queue__MaxAttempts: "3"
       DEVAUTOMATION_Agent__ClaudeImage: devautomation-claude:latest
       DEVAUTOMATION_Agent__DockerNetwork: devautomation-network
       DEVAUTOMATION_Agent__ApprovalMcpCommand: dotnet /app/DevAutomation.ApprovalMcp.dll
