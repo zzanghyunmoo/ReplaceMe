@@ -16,7 +16,7 @@
 | 시작 조건 | `DevAutomation.Worker`가 실행 중이고 Kafka topic에 agent job message가 들어옵니다. |
 | 핵심 책임 | 티켓 하나를 격리된 Docker agent 실행으로 바꿉니다. |
 | 주요 출력 | 실행 로그, 티켓 상태 변경, PR/MR URL입니다. |
-| 실패 시 | 티켓을 `Failed`로 바꾸고 실패 사유를 저장합니다. |
+| 실패 시 | Kafka 처리 실패는 bounded retry 후 DLQ로 보내고, agent 실행 결과 실패는 티켓을 `Failed`로 바꿉니다. |
 | 같이 봐야 할 문서 | `ticket-management.md`, `approval-flow.md`, `persistence-observability.md` |
 <!-- markdownlint-enable MD013 -->
 
@@ -62,6 +62,8 @@ flowchart TD
 | --- | --- | --- |
 | `Queue:KafkaBootstrapServers` | `localhost:9092` | Kafka broker |
 | `Queue:KafkaTopic` | `devautomation.agent-jobs` | agent job topic |
+| `Queue:KafkaDlqTopic` | `devautomation.agent-jobs.dlq` | exhausted/poison job DLQ topic |
+| `Queue:MaxAttempts` | `3` | Kafka processing attempts before DLQ |
 | `Agent:MaxConcurrentAgents` | `2` | Kafka worker concurrency |
 | `Agent:AgentTimeout` | `00:30:00` | 티켓당 최대 실행 시간 |
 | `Agent:ClaudeImage` | `devautomation-claude:latest` | agent container image |
@@ -109,9 +111,14 @@ docker compose up --build api worker postgres kafka
 2. API, worker, PostgreSQL, Kafka container가 실행됩니다.
 3. 티켓을 생성하면 API가 Kafka message를 발행하고 worker가 `AgentJob.RunAsync`를
    실행합니다.
-4. 성공 시 티켓은 `Completed`가 되고 PR/MR URL이 저장됩니다.
-5. 실패 시 티켓은 `Failed`가 되고 `FailReason`과 execution log를 확인할 수
-   있습니다.
+4. Kafka message는 `Attempt`, `LastFailureReason`, `LastFailedAt` metadata를 포함합니다.
+5. worker 처리 예외가 `Queue:MaxAttempts` 전에 발생하면 같은 topic에 재발행한 뒤
+   원본 offset을 commit합니다.
+6. attempts가 소진되거나 JSON/ticket id가 잘못된 poison message는
+   `Queue:KafkaDlqTopic`에 sanitized failure context와 함께 publish한 뒤 commit합니다.
+7. 성공 시 티켓은 `Completed`가 되고 PR/MR URL이 저장됩니다.
+8. agent 실행 결과 실패 시 티켓은 `Failed`가 되고 `FailReason`과 execution log를 확인할 수
+   있습니다. Kafka attempts 소진으로 DLQ에 들어간 기존 ticket도 `Failed`로 기록됩니다.
 
 실패하면 먼저 볼 곳:
 
@@ -122,7 +129,8 @@ docker compose up --build api worker postgres kafka
 
 ## 현재 한계
 
-- Kafka poison message DLQ와 재시도 정책은 아직 없습니다.
+- Kafka retry/DLQ는 worker 처리 예외와 poison message를 bounded 처리합니다. agent가 정상 실행되어
+  실패 결과를 반환한 경우에는 기존처럼 ticket failure로 종료합니다.
 - 컨테이너 권한, network policy, Docker socket 접근 제한은 운영 환경에서
   별도 hardening이 필요합니다.
 - Gmail notifier는 Gmail API access token 갱신을 자체 처리하지 않습니다.

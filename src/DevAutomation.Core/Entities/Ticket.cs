@@ -82,6 +82,15 @@ public sealed class Ticket
         FailReason = string.IsNullOrWhiteSpace(reason) ? "Unknown failure" : reason;
     }
 
+    public void MarkPendingRetry()
+    {
+        EnsureStatus(TicketStatus.Pending, TicketStatus.Running, TicketStatus.WaitingApproval);
+        Status = TicketStatus.Pending;
+        CompletedAt = null;
+        FailReason = null;
+        ClearContainer();
+    }
+
     public void MarkCancelled(DateTimeOffset completedAt, string? reason = null)
     {
         if (Status is TicketStatus.Completed)

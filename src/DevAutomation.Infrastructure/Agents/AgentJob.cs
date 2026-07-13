@@ -46,7 +46,7 @@ public sealed class AgentJob
         _logger = logger;
     }
 
-    public async Task RunAsync(Guid ticketId)
+    public async Task RunAsync(Guid ticketId, bool deferUnhandledFailureToQueue = false)
     {
         using var activity = DevAutomationTelemetry.ActivitySource.StartActivity("AgentJob.Run", ActivityKind.Internal);
         activity?.SetTag("ticket.id", ticketId);
@@ -152,11 +152,19 @@ public sealed class AgentJob
             _logger.LogError(ex, "Agent job failed for ticket {TicketId}.", ticketId);
             await FlushLogsAsync(CancellationToken.None);
             ticket.ClearContainer();
-            if (ticket.Status != TicketStatus.Cancelled)
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            DevAutomationTelemetry.AgentJobsFailed.Add(1, new KeyValuePair<string, object?>("agent.result", "exception"));
+
+            if (deferUnhandledFailureToQueue && ticket.Status is TicketStatus.Pending or TicketStatus.Running or TicketStatus.WaitingApproval)
+            {
+                _stateMachine.MarkPendingRetry(ticket);
+                await _dbContext.SaveChangesAsync(CancellationToken.None);
+                throw;
+            }
+
+            if (ticket.Status is not TicketStatus.Completed and not TicketStatus.Failed and not TicketStatus.Cancelled)
             {
                 _stateMachine.MarkFailed(ticket, _clock.UtcNow, ex.Message);
-                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                DevAutomationTelemetry.AgentJobsFailed.Add(1, new KeyValuePair<string, object?>("agent.result", "exception"));
                 await _dbContext.SaveChangesAsync(CancellationToken.None);
                 await _issueTrackerService.NotifyFailedAsync(ticket, ticket.FailReason ?? ex.Message, CancellationToken.None);
                 await _ticketNotifier.NotifyStatusChangedAsync(ticket, CancellationToken.None);

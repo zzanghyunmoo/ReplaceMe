@@ -73,6 +73,8 @@ Dockerfiles가 build 시 image trust store에 추가합니다.
 | --- | --- |
 | `DEVAUTOMATION_Queue__KafkaBootstrapServers` | API/worker가 사용할 Kafka API broker |
 | `DEVAUTOMATION_Queue__KafkaConsumerGroupId` | worker consumer group, 기본 `devautomation-api`(기존 offset 호환용) |
+| `DEVAUTOMATION_Queue__KafkaDlqTopic` | exhausted/poison agent job을 publish할 DLQ topic |
+| `DEVAUTOMATION_Queue__MaxAttempts` | worker 처리 실패를 DLQ 전에 시도할 최대 Kafka attempt 수 |
 | `DEVAUTOMATION_Agent__AnthropicApiKey` | agent container에 주입할 Anthropic API key |
 | `DEVAUTOMATION_Agent__RemoteRepositoryProvider` | `GitHub` 또는 `GitLab` |
 | `DEVAUTOMATION_Agent__GitHubToken` | GitHub push/PR 생성 token |
@@ -170,4 +172,4 @@ docker run --rm -v "$PWD":/src -w /src \
 - Docker socket mount는 로컬 개발용이며, 운영에서는 별도 격리가 필요합니다. 현재 API도
   cancellation과 Docker health check 때문에 socket을 공유하며, worker-only Docker control
   전환은 ZZA-64에서 다룹니다.
-- Kafka poison message DLQ와 재시도 정책은 아직 없습니다.
+- Kafka worker는 처리 예외를 bounded retry 후 DLQ로 보내지만, DLQ replay tooling은 아직 수동 운영 절차입니다.
