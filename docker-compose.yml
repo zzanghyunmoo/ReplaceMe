@@ -12,6 +12,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       DEVAUTOMATION_Telemetry__ServiceName: DevAutomation.Api
+      DEVAUTOMATION_Telemetry__Enabled: ${DEVAUTOMATION_Telemetry__Enabled:-false}
+      DEVAUTOMATION_Telemetry__OtlpEndpoint: ${DEVAUTOMATION_Telemetry__OtlpEndpoint:-http://otel-collector:4317}
+      DEVAUTOMATION_Telemetry__OtlpHeaders: ${DEVAUTOMATION_Telemetry__OtlpHeaders:-}
       DEVAUTOMATION_Database__ApplyMigrations: "false"
       DEVAUTOMATION_ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=devautomation;Username=devautomation;Password=devautomation
       DEVAUTOMATION_Queue__KafkaBootstrapServers: kafka:9092
@@ -66,6 +69,9 @@ services:
     environment:
       DOTNET_ENVIRONMENT: Development
       DEVAUTOMATION_Telemetry__ServiceName: DevAutomation.Worker
+      DEVAUTOMATION_Telemetry__Enabled: ${DEVAUTOMATION_Telemetry__Enabled:-false}
+      DEVAUTOMATION_Telemetry__OtlpEndpoint: ${DEVAUTOMATION_Telemetry__OtlpEndpoint:-http://otel-collector:4317}
+      DEVAUTOMATION_Telemetry__OtlpHeaders: ${DEVAUTOMATION_Telemetry__OtlpHeaders:-}
       DEVAUTOMATION_Database__ApplyMigrations: "false"
       DEVAUTOMATION_ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=devautomation;Username=devautomation;Password=devautomation
       DEVAUTOMATION_Queue__KafkaBootstrapServers: kafka:9092
@@ -133,6 +139,47 @@ services:
     image: devautomation-claude:latest
     profiles: ["build-only"]
     command: "echo agent image built"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.104.0
+    profiles: ["observability"]
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./docker/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8889:8889"
+    depends_on:
+      jaeger:
+        condition: service_started
+    networks:
+      - devautomation
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    profiles: ["observability"]
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+    networks:
+      - devautomation
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    profiles: ["observability"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      otel-collector:
+        condition: service_started
+    networks:
+      - devautomation
 
 volumes:
   postgres-data:

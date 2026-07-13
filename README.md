@@ -42,6 +42,17 @@ docker compose --profile build-only build agent-image
 docker compose up --build api worker postgres kafka
 ```
 
+OpenTelemetry trace/metric을 로컬에서 볼 때는 telemetry를 켜고 `observability`
+profile을 추가합니다. 기본 stack은 collector 없이 동작합니다.
+
+```bash
+DEVAUTOMATION_Telemetry__Enabled=true \
+  docker compose --profile observability up --build
+```
+
+Jaeger UI는 `http://localhost:16686`, Prometheus는 `http://localhost:9090`에서
+확인합니다.
+
 API는 `http://localhost:8080`에서 실행됩니다. Compose의 one-shot `migrate`
 서비스가 EF Core migration을 먼저 적용한 뒤 `api`와 `worker`가 시작됩니다.
 `worker` 서비스가 Kafka를 consume하고 agent job을 실행하며, API service는 HTTP
@@ -94,7 +105,9 @@ GET /health
 - `DEVAUTOMATION_IssueTracker__Provider` — `Jira`, `Linear`, `None`
 - `DEVAUTOMATION_DocumentTool__Provider` — `Notion`, `Confluence`, `None`
 - `DEVAUTOMATION_Telemetry__Enabled`
-- `DEVAUTOMATION_Telemetry__OtlpEndpoint`
+- `DEVAUTOMATION_Telemetry__OtlpEndpoint` — 로컬 compose profile 기본값은
+  `http://otel-collector:4317`
+- `DEVAUTOMATION_Telemetry__OtlpHeaders`
 
 자세한 값은 `.env.example`을 참고하세요.
 

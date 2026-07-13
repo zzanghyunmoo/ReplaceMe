@@ -178,21 +178,47 @@ grep -R -E "(ghp_|github_pat_|glpat-|sk-ant-|xox[baprs]-|xapp-)" logs \
 - secret이 필요한 경우 `[REDACTED]`로 보여야 합니다.
 - secret catalog coverage는 readiness profile의 `secrets.redaction.coverage` check로 함께 확인합니다.
 
-## OBS-007. OpenTelemetry 설정 smoke test
+## OBS-007. OpenTelemetry profile smoke test
 
-OTLP collector가 준비된 환경에서만 실행합니다. `.env` 예시:
+기본 stack에서 collector가 없어도 compose 설정이 유효한지 먼저 확인합니다.
 
-```env
-DEVAUTOMATION_Telemetry__Enabled=true
-DEVAUTOMATION_Telemetry__OtlpEndpoint=http://<collector-host>:4317
+```bash
+docker compose config --quiet
 ```
 
-API와 worker를 재시작한 뒤 `/health`, ticket 생성 등을 실행합니다.
+관측성 profile 설정도 확인합니다.
+
+```bash
+docker compose --profile observability config --quiet
+```
+
+OTLP collector와 로컬 backend를 함께 실행합니다.
+
+```bash
+DEVAUTOMATION_Telemetry__Enabled=true \
+  docker compose --profile observability up --build
+```
+
+API와 worker가 시작된 뒤 `/health`, ticket 생성 등을 실행합니다.
+
+```bash
+curl -s "$BASE_URL/health" | jq .
+```
+
+Jaeger와 Prometheus에서 수신 상태를 확인합니다.
+
+```text
+http://localhost:16686
+http://localhost:9090
+```
 
 기대 결과:
 
-- collector에 API ASP.NET Core request trace/metric과 worker `DevAutomationTelemetry` activity/metric이 들어옵니다.
-- collector가 없으면 export 실패 로그가 날 수 있으므로 기본 QA에서는 비활성화합니다.
+- 기본 `docker compose config --quiet`가 collector 없이 통과합니다.
+- `observability` profile config가 OTel Collector, Jaeger, Prometheus를 포함합니다.
+- Jaeger에서 `DevAutomation.Api` 또는 `DevAutomation.Worker` trace를 조회할 수 있습니다.
+- Prometheus에서 collector가 노출한 application/runtime metric을 조회할 수 있습니다.
+- collector가 없으면 export 실패 로그가 날 수 있으므로 기본 QA에서는 telemetry를 비활성화합니다.
 
 ## 완료 체크리스트
 

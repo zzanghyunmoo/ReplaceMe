@@ -6,8 +6,10 @@ ReplaceMe는 Docker Compose로 API, worker, PostgreSQL, Kafka-compatible broker,
 agent image를 함께 실행할 수 있게 구성되어 있습니다. Compose의 `api` 서비스는
 HTTP endpoint와 health check만 담당하고, `worker` 서비스가 Kafka agent job을
 consume합니다. Compose의 `kafka` 서비스는 Redpanda를 실행하며, 애플리케이션은
-Kafka API로 접근합니다. `/health` endpoint로 PostgreSQL, broker, Docker daemon
-연결 상태를 확인합니다.
+Kafka API로 접근합니다. 선택 사항인 `observability` profile은 OpenTelemetry
+Collector, Jaeger, Prometheus를 추가해 API/worker trace와 metric을 로컬에서
+확인하게 합니다. `/health` endpoint로 PostgreSQL, broker, Docker daemon 연결 상태를
+확인합니다.
 
 ## 한눈에 보기
 
@@ -15,6 +17,7 @@ Kafka API로 접근합니다. `/health` endpoint로 PostgreSQL, broker, Docker d
 | --- | --- |
 | 시작 조건 | `.env`를 준비하고 Docker Compose를 실행합니다. |
 | 핵심 책임 | 로컬 API, worker, DB, Kafka-compatible broker, agent image를 함께 띄웁니다. |
+| 선택 profile | `observability`는 OTel Collector, Jaeger, Prometheus를 추가합니다. |
 | 주요 확인 | `/health`, compose container 상태, test 명령입니다. |
 | 실패 시 | DB/broker/Docker 연결 문제를 먼저 확인합니다. |
 | ZZA-51 이후 | `/health`와 별도로 profile readiness endpoint가 추가될 예정입니다. |
@@ -29,12 +32,17 @@ flowchart LR
     Compose --> Postgres[(postgres\nticket / approval / logs)]
     Compose --> Kafka[(kafka service\nRedpanda broker)]
     Compose --> AgentImage[agent-image\nClaude Code + Approval MCP]
+    Compose -. observability profile .-> Collector[otel-collector]
+    Collector -. traces .-> Jaeger[Jaeger UI]
+    Collector -. metrics .-> Prometheus[Prometheus]
     Migrate --> Postgres
     API --> Postgres
     API --> Kafka
     Worker --> Postgres
     Worker --> Kafka
     Worker --> DockerSock[/Docker socket/]
+    API -. OTLP when enabled .-> Collector
+    Worker -. OTLP when enabled .-> Collector
     DockerSock --> AgentImage
 ```
 
@@ -47,6 +55,23 @@ cp .env.example .env
 docker compose --profile build-only build agent-image
 docker compose up --build api worker postgres kafka
 ```
+
+관측성 stack을 함께 띄울 때는 telemetry를 켠 뒤 `observability` profile을 사용합니다.
+기본 stack에서는 telemetry가 꺼져 있어 collector가 필요하지 않습니다.
+
+```bash
+DEVAUTOMATION_Telemetry__Enabled=true \
+  docker compose --profile observability up --build
+```
+
+로컬 UI와 endpoint는 다음 주소를 사용합니다.
+
+| 대상 | 주소 | 용도 |
+| --- | --- | --- |
+| Jaeger | `http://localhost:16686` | API/worker trace 조회 |
+| Prometheus | `http://localhost:9090` | Collector가 받은 metric 조회 |
+| OTel Collector gRPC | `http://localhost:4317` | OTLP/gRPC 수신 |
+| OTel Collector HTTP | `http://localhost:4318` | OTLP/HTTP 수신 |
 
 `api`와 `worker`는 `migrate` one-shot service가 EF Core migration을 끝낸 뒤
 시작합니다. `docker compose up --build api worker postgres kafka`를 실행하면
@@ -82,6 +107,8 @@ Dockerfiles가 build 시 image trust store에 추가합니다.
 | `DEVAUTOMATION_IssueTracker__Provider` | `Jira`, `Linear`, `None` |
 | `DEVAUTOMATION_DocumentTool__Provider` | `Notion`, `Confluence`, `None` |
 | `DEVAUTOMATION_Telemetry__Enabled` | OpenTelemetry export 활성화 여부 |
+| `DEVAUTOMATION_Telemetry__OtlpEndpoint` | OTLP endpoint, Compose 관측성 profile 기본값은 `http://otel-collector:4317` |
+| `DEVAUTOMATION_Telemetry__OtlpHeaders` | 외부 collector/SaaS 사용 시 추가 OTLP header, 로컬 profile은 비워 둡니다. |
 <!-- markdownlint-enable MD013 -->
 
 `appsettings.json`에는 민감값을 넣지 않고, `.env` 또는 runtime environment로
@@ -157,6 +184,8 @@ docker run --rm -v "$PWD":/src -w /src \
 ## 코드 위치
 
 - Compose: `docker-compose.yml`
+- OTel Collector config: `docker/otel-collector-config.yaml`
+- Prometheus scrape config: `docker/prometheus.yml`
 - API/worker image targets: `Dockerfile`
 - Agent image: `Dockerfile.agent`
 - 설정: `src/DevAutomation.Api/appsettings.json`, `.env.example`
