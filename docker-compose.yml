@@ -6,7 +6,7 @@ services:
       target: api
     image: devautomation-api:local
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     env_file:
       - .env
     environment:
@@ -18,14 +18,14 @@ services:
       DEVAUTOMATION_Database__ApplyMigrations: "false"
       DEVAUTOMATION_ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=devautomation;Username=devautomation;Password=devautomation
       DEVAUTOMATION_Queue__KafkaBootstrapServers: kafka:9092
-      DEVAUTOMATION_Queue__KafkaDlqTopic: devautomation.agent-jobs.dlq
-      DEVAUTOMATION_Queue__MaxAttempts: "3"
+      DEVAUTOMATION_Queue__KafkaDlqTopic: "${DEVAUTOMATION_Queue__KafkaDlqTopic:-devautomation.agent-jobs.dlq}"
+      DEVAUTOMATION_Queue__MaxAttempts: "${DEVAUTOMATION_Queue__MaxAttempts:-3}"
       DEVAUTOMATION_Agent__ClaudeImage: devautomation-claude:latest
       DEVAUTOMATION_Agent__DockerNetwork: devautomation-network
-      DEVAUTOMATION_Agent__ExecutionIsolationProfile: LocalDevelopment
-      DEVAUTOMATION_Agent__DockerSocketMode: LocalDockerSocket
-      DEVAUTOMATION_Agent__AllowLocalDockerSocket: "true"
-      DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike: "false"
+      DEVAUTOMATION_Agent__ExecutionIsolationProfile: "${DEVAUTOMATION_Agent__ExecutionIsolationProfile:-LocalDevelopment}"
+      DEVAUTOMATION_Agent__DockerSocketMode: "${DEVAUTOMATION_Agent__DockerSocketMode:-LocalDockerSocket}"
+      DEVAUTOMATION_Agent__AllowLocalDockerSocket: "${DEVAUTOMATION_Agent__AllowLocalDockerSocket:-true}"
+      DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike: "${DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike:-false}"
       DEVAUTOMATION_Agent__ApprovalMcpCommand: dotnet /app/DevAutomation.ApprovalMcp.dll
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -82,14 +82,14 @@ services:
       DEVAUTOMATION_ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=devautomation;Username=devautomation;Password=devautomation
       DEVAUTOMATION_Queue__KafkaBootstrapServers: kafka:9092
       DEVAUTOMATION_Queue__KafkaConsumerGroupId: devautomation-api
-      DEVAUTOMATION_Queue__KafkaDlqTopic: devautomation.agent-jobs.dlq
-      DEVAUTOMATION_Queue__MaxAttempts: "3"
+      DEVAUTOMATION_Queue__KafkaDlqTopic: "${DEVAUTOMATION_Queue__KafkaDlqTopic:-devautomation.agent-jobs.dlq}"
+      DEVAUTOMATION_Queue__MaxAttempts: "${DEVAUTOMATION_Queue__MaxAttempts:-3}"
       DEVAUTOMATION_Agent__ClaudeImage: devautomation-claude:latest
       DEVAUTOMATION_Agent__DockerNetwork: devautomation-network
-      DEVAUTOMATION_Agent__ExecutionIsolationProfile: LocalDevelopment
-      DEVAUTOMATION_Agent__DockerSocketMode: LocalDockerSocket
-      DEVAUTOMATION_Agent__AllowLocalDockerSocket: "true"
-      DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike: "false"
+      DEVAUTOMATION_Agent__ExecutionIsolationProfile: "${DEVAUTOMATION_Agent__ExecutionIsolationProfile:-LocalDevelopment}"
+      DEVAUTOMATION_Agent__DockerSocketMode: "${DEVAUTOMATION_Agent__DockerSocketMode:-LocalDockerSocket}"
+      DEVAUTOMATION_Agent__AllowLocalDockerSocket: "${DEVAUTOMATION_Agent__AllowLocalDockerSocket:-true}"
+      DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike: "${DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike:-false}"
       DEVAUTOMATION_Agent__ApprovalMcpCommand: dotnet /app/DevAutomation.ApprovalMcp.dll
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -109,7 +109,7 @@ services:
       POSTGRES_USER: devautomation
       POSTGRES_PASSWORD: devautomation
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -140,7 +140,7 @@ services:
       - --advertise-kafka-addr
       - PLAINTEXT://kafka:9092,OUTSIDE://localhost:9092
     ports:
-      - "9092:9094"
+      - "127.0.0.1:9092:9094"
     networks:
       - devautomation
 
@@ -159,9 +159,9 @@ services:
     volumes:
       - ./docker/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
     ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "8889:8889"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+      - "127.0.0.1:8889:8889"
     depends_on:
       jaeger:
         condition: service_started
@@ -174,7 +174,7 @@ services:
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     ports:
-      - "16686:16686"
+      - "127.0.0.1:16686:16686"
     networks:
       - devautomation
 
@@ -186,7 +186,7 @@ services:
     volumes:
       - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     depends_on:
       otel-collector:
         condition: service_started

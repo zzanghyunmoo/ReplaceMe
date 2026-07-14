@@ -82,6 +82,52 @@ public sealed class HostingCompositionTests
         Assert.Contains("condition: service_completed_successfully", apiService);
     }
 
+    [Fact]
+    public void ComposePublishesExactlyTheExpectedLocalServicesOnLoopbackOnly()
+    {
+        var compose = ReadRepoFile("docker-compose.yml");
+        var publishedPorts = ReadComposePublishedPorts(compose);
+        var expectedPorts = new[]
+        {
+            "127.0.0.1:4317:4317",
+            "127.0.0.1:4318:4318",
+            "127.0.0.1:5432:5432",
+            "127.0.0.1:8080:8080",
+            "127.0.0.1:8889:8889",
+            "127.0.0.1:9090:9090",
+            "127.0.0.1:9092:9094",
+            "127.0.0.1:16686:16686"
+        };
+
+        Assert.All(publishedPorts, port => Assert.StartsWith("127.0.0.1:", port));
+        Assert.Equal(expectedPorts.Order(), publishedPorts.Order());
+    }
+
+    [Fact]
+    public void ComposeAllowsAllQueueAndIsolationOverridesFromEnvironmentInApiAndWorker()
+    {
+        var compose = ReadRepoFile("docker-compose.yml");
+        var apiService = SliceBetween(compose, "  api:", "\n  migrate:");
+        var workerService = SliceBetween(compose, "  worker:", "\n  postgres:");
+        var expectedOverrides = new Dictionary<string, string>
+        {
+            ["DEVAUTOMATION_Queue__KafkaDlqTopic"] = "devautomation.agent-jobs.dlq",
+            ["DEVAUTOMATION_Queue__MaxAttempts"] = "3",
+            ["DEVAUTOMATION_Agent__ExecutionIsolationProfile"] = "LocalDevelopment",
+            ["DEVAUTOMATION_Agent__DockerSocketMode"] = "LocalDockerSocket",
+            ["DEVAUTOMATION_Agent__AllowLocalDockerSocket"] = "true",
+            ["DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike"] = "false"
+        };
+
+        foreach (var service in new[] { apiService, workerService })
+        {
+            foreach (var (key, defaultValue) in expectedOverrides)
+            {
+                Assert.Contains($"{key}: \"${{{key}:-{defaultValue}}}\"", service);
+            }
+        }
+    }
+
     private static IConfiguration CreateConfiguration()
     {
         return new ConfigurationBuilder()
@@ -112,6 +158,61 @@ public sealed class HostingCompositionTests
         var end = content.IndexOf(endMarker, start + startMarker.Length, StringComparison.Ordinal);
         Assert.True(end > start, $"Missing marker {endMarker}");
         return content[start..end];
+    }
+
+    private static IReadOnlyList<string> ReadComposePublishedPorts(string compose)
+    {
+        var publishedPorts = new List<string>();
+        var inServices = false;
+        var inPorts = false;
+
+        foreach (var line in compose.Split('\n'))
+        {
+            var trimmedLine = line.Trim();
+            var indentation = line.Length - line.TrimStart().Length;
+
+            if (trimmedLine == "services:")
+            {
+                inServices = true;
+                continue;
+            }
+
+            if (!inServices)
+            {
+                continue;
+            }
+
+            if (trimmedLine.Length > 0 && indentation == 0)
+            {
+                break;
+            }
+
+            if (indentation == 4 && trimmedLine == "ports:")
+            {
+                inPorts = true;
+                continue;
+            }
+
+            if (inPorts && trimmedLine.Length > 0 && indentation <= 4)
+            {
+                inPorts = false;
+            }
+
+            if (!inPorts || indentation != 6 || !trimmedLine.StartsWith("- ", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var port = trimmedLine[2..].Trim();
+            if (port.Length >= 2 && port[0] == port[^1] && port[0] is '\'' or '"')
+            {
+                port = port[1..^1];
+            }
+
+            publishedPorts.Add(port);
+        }
+
+        return publishedPorts;
     }
 
     private static bool IsKafkaAgentWorkerRegistration(ServiceDescriptor descriptor)
