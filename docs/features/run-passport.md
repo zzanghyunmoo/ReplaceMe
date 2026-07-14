@@ -148,8 +148,8 @@ Host 규칙:
 - Contract tests: `tests/DevAutomation.Tests/RunPassportContractTests.cs`
 - HTTP tests: `tests/DevAutomation.Tests/RunPassportEndpointTests.cs`
 
-HTTP test는 `200`, `404`, camelCase v1 wire shape, explicit null, Jira configured host,
-Ticket/log/Kafka non-mutation을 검증합니다.
+HTTP test는 `200`, `404`, camelCase v1 wire shape, explicit null,
+Jira configured host, Ticket/log/Kafka non-mutation을 검증합니다.
 
 ## 현재 한계
 
