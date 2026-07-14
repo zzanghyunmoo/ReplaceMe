@@ -12,14 +12,17 @@ flowchart LR
     User[API caller] --> API[DevAutomation.Api]
     API --> DB[(PostgreSQL)]
     API --> Queue[(Redpanda Kafka API)]
+    API --> Issue[Linear/Jira/None]
     Queue --> Worker[DevAutomation.Worker]
     Worker --> Job[AgentJob]
+    Job --> DB
+    Job --> HostNotifier[host status notifier: Slack/Gmail/None]
     Job --> Docker[DockerAgentRunner]
     Docker --> Agent[Claude Code container]
     Agent --> Repo[GitHub PR 또는 GitLab MR]
     Agent --> MCP[Approval MCP]
     MCP --> DB
-    MCP --> Notifier[현재 agent container는 Slack 기본값]
+    MCP --> ApprovalNotifier[Approval MCP notifier: 현재 Slack 기본값]
     API --> Doc[Notion/Confluence/None]
     API -. optional OTLP .-> OTel[OTel Collector]
     Worker -. optional OTLP .-> OTel
@@ -55,13 +58,15 @@ flowchart LR
    외부 issue 자체를 실행 입력으로 수신하는 grammar는 ZZA-53 backlog입니다.
 4. Kafka topic에 ticket ID와 attempt metadata를 publish합니다.
 5. Worker가 message를 consume하고 `AgentJob`을 실행합니다.
-6. `AgentJob`은 terminal ticket replay를 no-op 처리하고, 그 외 ticket을
-   `Running`으로 전이합니다.
-7. Docker agent가 repo를 clone하고 `agent/ticket-<id>` branch에서 작업합니다.
-8. 필요한 경우 Approval MCP로 `WaitingApproval` 상태를 거칩니다.
-9. 결과에 따라 Ticket을 `Completed` 또는 `Failed`로 전이하고 로그를 기록합니다.
-   Agent가 URL을 반환한 경우에만 PR/MR URL도 저장합니다.
-10. worker 처리 예외는 bounded retry 후 DLQ로 이동합니다.
+6. `AgentJob`은 terminal ticket replay를 no-op 처리하고, 그 외 ticket은 worker-side
+   pre-run readiness gate를 다시 평가합니다. runnable이 아니면 `Running` 전이와
+   container 생성 전에 `Failed`로 저장하고 알림을 보냅니다.
+7. gate를 통과하면 `Running`으로 전이하고 host status notifier로 알립니다.
+8. Docker agent가 repo를 clone하고 `agent/ticket-<id>` branch에서 작업합니다.
+9. 필요한 경우 Approval MCP로 `WaitingApproval` 상태를 거칩니다.
+10. 결과에 따라 Ticket을 `Completed` 또는 `Failed`로 전이하고 로그를 기록합니다.
+    Agent가 URL을 반환한 경우에만 PR/MR URL도 저장합니다.
+11. worker 처리 예외는 bounded retry 후 DLQ로 이동합니다.
 
 ## 신뢰와 데이터 경계
 
@@ -70,8 +75,10 @@ flowchart LR
   공개하지 않습니다. Slack callback QA만 단일 path 제한 proxy를 사용합니다.
 - API와 worker가 host Docker socket을 mount하므로 공유·production-like 환경에
   그대로 배포할 수 없습니다.
+- host의 `AgentJob` status notifier는 `Slack/Gmail/None` 선택을 따릅니다. 이 경로는
+  agent container 안의 Approval MCP egress와 별개입니다.
 - agent container에는 선택된 coding/repository provider secret과 Approval MCP
-  runtime 값만 allowlist로 전달합니다. 다만 `Notifier:Provider`와 Gmail 설정은
+  runtime 값만 allowlist로 전달합니다. 다만 host의 `Notifier:Provider`와 Gmail 설정은
   전달되지 않아 container의 Approval MCP는 현재 Slack 기본값을 사용합니다.
 - secret redaction은 agent stream, readiness, Kafka failure payload 중심입니다.
   framework/provider/file log 전체를 보장하지 않습니다.

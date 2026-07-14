@@ -126,108 +126,26 @@ provider별 secret을 놓칠 수 있으므로, `.env`에 설정된 실제 값도
 합니다.
 
 ```bash
-set -euo pipefail
-curl -fsS "$BASE_URL/api/tickets/$OBS_TICKET_ID/logs?page=1&pageSize=500" \
-  > /tmp/replaceme-observe-logs.json
-docker compose logs --no-color api worker migrate \
-  > /tmp/replaceme-compose-logs.txt
-test -s /tmp/replaceme-observe-logs.json
-test -s /tmp/replaceme-compose-logs.txt
-test -d logs
-python3 - <<'PY'
-from pathlib import Path
-import json
-
-payload = json.loads(Path('/tmp/replaceme-observe-logs.json').read_text())
-if not isinstance(payload, list) or not payload:
-    raise SystemExit('execution log JSON must be a non-empty array')
-if not any(p.stat().st_size > 0 for p in Path('logs').glob('devautomation-*.log')):
-    raise SystemExit('at least one non-empty file log is required')
-PY
-
-python3 - <<'PY'
-from pathlib import Path
-import shlex
-
-log_text = Path('/tmp/replaceme-observe-logs.json').read_text(errors='ignore')
-log_text += '\n' + Path('/tmp/replaceme-compose-logs.txt').read_text(errors='ignore')
-log_text += '\n' + '\n'.join(
-    p.read_text(errors='ignore') for p in Path('logs').glob('devautomation-*.log')
-)
-secret_keys = [
-    'DEVAUTOMATION_Agent__AnthropicApiKey',
-    'DEVAUTOMATION_Agent__GitHubToken',
-    'DEVAUTOMATION_Agent__GitLabToken',
-    'DEVAUTOMATION_Slack__BotToken',
-    'DEVAUTOMATION_Slack__SigningSecret',
-    'DEVAUTOMATION_Gmail__AccessToken',
-    'DEVAUTOMATION_Jira__ApiToken',
-    'DEVAUTOMATION_Linear__ApiKey',
-    'DEVAUTOMATION_Notion__ApiToken',
-    'DEVAUTOMATION_Confluence__ApiToken',
-    'DEVAUTOMATION_Langfuse__PublicKey',
-    'DEVAUTOMATION_Langfuse__SecretKey',
-    'DEVAUTOMATION_LiteLLM__ApiKey',
-    'DEVAUTOMATION_LiteLLM__VirtualKey',
-    'DEVAUTOMATION_Telemetry__OtlpHeaders',
-]
-values = {}
-for line in Path('.env').read_text(errors='ignore').splitlines():
-    if not line or line.lstrip().startswith('#') or '=' not in line:
-        continue
-    key, raw_value = line.split('=', 1)
-    try:
-        value = ' '.join(shlex.split(raw_value, comments=True, posix=True))
-    except ValueError:
-        value = raw_value.strip()
-    if key in secret_keys and len(value) >= 8:
-        values[key] = value
-leaked = [key for key, value in values.items() if value in log_text]
-if leaked:
-    print('SECRET LEAK keys:', ', '.join(leaked))
-    raise SystemExit(1)
-print('no configured secret values found in logs')
-PY
+python3 scripts/scan-local-secret-leaks.py \
+  --base-url "$BASE_URL" \
+  --ticket-id "$OBS_TICKET_ID"
 ```
 
-pattern 기반 보조 검사도 실행합니다.
-
-```bash
-set -euo pipefail
-test -d logs
-test -s /tmp/replaceme-observe-logs.json
-test -s /tmp/replaceme-compose-logs.txt
-python3 - <<'PY'
-from pathlib import Path
-import json
-
-payload = json.loads(Path('/tmp/replaceme-observe-logs.json').read_text())
-if not isinstance(payload, list) or not payload:
-    raise SystemExit('execution log JSON must be a non-empty array')
-if not any(p.stat().st_size > 0 for p in Path('logs').glob('devautomation-*.log')):
-    raise SystemExit('at least one non-empty file log is required')
-PY
-set +e
-grep -R -q -E "(ghp_|github_pat_|glpat-|sk-ant-|xox[baprs]-|xapp-)" \
-  logs /tmp/replaceme-observe-logs.json /tmp/replaceme-compose-logs.txt
-grep_status=$?
-set -e
-case "$grep_status" in
-  0) echo "SECRET-LIKE PATTERN FOUND"; exit 1 ;;
-  1) echo "no common secret-like pattern in execution/file/Compose logs" ;;
-  *) echo "secret pattern scan failed"; exit "$grep_status" ;;
-esac
-rm -f /tmp/replaceme-observe-logs.json /tmp/replaceme-compose-logs.txt
-```
+공통 스크립트는 execution log endpoint를 마지막 page까지 조회하고 JSON의 decoded
+`Content`를 API/worker file log 및 Compose stdout과 합쳐 검사합니다. 임시 저장소는 예측
+불가능한 경로에 `0700`으로 만들고 파일은 `0600`으로 제한하며, 성공·실패와 관계없이
+정리합니다. configured secret 값, common GitHub/GitLab/Anthropic/Slack token pattern,
+입력 및 local log surface 검증 중 하나라도 실패하면 nonzero로 종료합니다.
 
 기대 결과:
 
 - configured secret value가 발견되면 실패입니다. 출력은 key 이름만 표시하고 secret 원문은 표시하지 않습니다.
-- common token pattern이 보이면 추가 확인 대상입니다.
+- common token pattern이 보이면 실패합니다. 출력에는 pattern 종류만 표시합니다.
 - secret이 필요한 경우 `[REDACTED]`로 보여야 합니다.
 - secret catalog coverage는 readiness profile의 `secrets.redaction.coverage` check로 함께 확인합니다.
 - Agent stream redaction이 Serilog/provider/Compose stdout 전체를 보장하지 않으므로 모든
-  local log surface를 검사합니다.
+  local log surface를 검사합니다. 외부 관측 sink나 파생·인코딩된 secret의 부재까지
+  증명하는 검사는 아닙니다.
 
 ## OBS-007. OpenTelemetry profile smoke test
 
