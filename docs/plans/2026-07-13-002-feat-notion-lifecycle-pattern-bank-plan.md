@@ -33,7 +33,7 @@ ReplaceMe needs a Notion surface that is useful during and after each automated 
 
 ### Problem Frame
 
-Run Passport v0 already reserves `notionDocumentId` and `notionDocumentUrl` and defines shared run identity fields in [`../features/run-passport.md`](../features/run-passport.md). The current document tool can create a simple ticket document, but it does not define lifecycle sections, idempotent update semantics, backlinks, or reusable pattern promotion rules. If Notion pages, PR packets, and Linear comments each invent separate naming and linking conventions, ZZA-55 and ZZA-53 will need avoidable normalization work.
+Run Passport v1 already reserves `notionDocumentId` and `notionDocumentUrl` and defines shared run identity fields in [`../features/run-passport.md`](../features/run-passport.md). The current document tool can create a simple ticket document, but it does not define lifecycle sections, idempotent update semantics, backlinks, or reusable pattern promotion rules. If Notion pages, PR packets, and Linear comments each invent separate naming and linking conventions, ZZA-55 and ZZA-53 will need avoidable normalization work.
 
 The infrastructure roadmap in [`2026-07-13-001-feat-infra-foundation-roadmap-plan.md`](./2026-07-13-001-feat-infra-foundation-roadmap-plan.md) is dependency context only. ZZA-59 and ZZA-61 have since delivered the API/worker split and retry/DLQ baseline; this plan still does not duplicate OpenTelemetry Collector or Langfuse implementation details, and only states which Notion evidence slots those later capabilities may fill.
 
@@ -50,7 +50,7 @@ The infrastructure roadmap in [`2026-07-13-001-feat-infra-foundation-roadmap-pla
 **Lifecycle page contract**
 
 - R1. v1 must define one ticket/run-scoped Notion lifecycle page template with stable property names and section headings.
-- R2. The lifecycle page must include Run Passport v0 identity: `contractVersion`, `runPassportId`, `runPassportUrl`, `ticketId`, `title`, `status`, and lifecycle timestamps when available.
+- R2. The lifecycle page must include Run Passport v1 identity: `contractVersion`, `runPassportId`, `runPassportUrl`, `ticketId`, `title`, `status`, and lifecycle timestamps when available.
 - R3. The lifecycle page must include backlink fields for Linear issue, GitHub PR/MR, and Notion page identity without requiring any one external surface to exist first.
 - R4. The lifecycle page must separate human-authored notes from generated evidence so later updates do not overwrite operator notes.
 - R5. The lifecycle page must not store secrets, raw execution logs, local filesystem paths, approval payloads, or unredacted prompt/model output.
@@ -67,7 +67,7 @@ The infrastructure roadmap in [`2026-07-13-001-feat-infra-foundation-roadmap-pla
 - R10. Lifecycle page auto-create/update must be idempotent and keyed by `runPassportId` plus provider/page id once persistence exists.
 - R11. Although the API/worker split and retry/DLQ baseline from the infra roadmap are now available, lifecycle page creation should remain explicit/manual or endpoint-driven until idempotency, persistence, and redaction safety are in place; no background worker hook is required by this plan.
 - R12. Linear, GitHub, and Notion backlink updates must use idempotent markers or stable sections so reruns update the existing reference instead of appending duplicates.
-- R13. Run Passport remains the common read contract. Notion links should enrich Run Passport when persistence exists, but Run Passport v0 must remain usable with null Notion fields.
+- R13. Run Passport remains the common read contract. Notion links should enrich Run Passport when persistence exists, but Run Passport v1 must remain usable with null Notion fields.
 
 **Langfuse evidence boundary**
 
@@ -109,7 +109,7 @@ The infrastructure roadmap in [`2026-07-13-001-feat-infra-foundation-roadmap-pla
 
 **Purpose:** one page per ReplaceMe ticket/run that explains intent, current state, links, generated evidence, and human review notes.
 
-**Creation key:** `runPassportId` from Run Passport v0. If a later persistent document table exists, it should store `{ runPassportId, provider, documentId, documentUrl }` and use it for idempotent updates.
+**Creation key:** `runPassportId` from Run Passport v1. If a later persistent document table exists, it should store `{ runPassportId, provider, documentId, documentUrl }` and use it for idempotent updates.
 
 **Recommended title format:** `ReplaceMe Run - {externalIssueKey or shortTicketId} - {title}`.
 
@@ -119,13 +119,13 @@ The infrastructure roadmap in [`2026-07-13-001-feat-infra-foundation-roadmap-pla
 | --- | --- | --- | --- | --- |
 | `Run Passport ID` | text | `runPassportId` | Yes | Stable idempotency key, e.g. `ticket:{ticketId}`. |
 | `Run Passport URL` | url/text | `runPassportUrl` | Yes | Relative API URL is acceptable until a public base URL exists. |
-| `Contract Version` | select/text | `contractVersion` | Yes | Starts with `run-passport-summary/v0`. |
+| `Contract Version` | select/text | `contractVersion` | Yes | Starts with `run-passport-summary/v1`. |
 | `Ticket ID` | text | `ticketId` | Yes | Original ReplaceMe ticket id. |
 | `Title` | title | `title` | Yes | Human title. |
 | `Status` | select | `status` | Yes | Mirrors Run Passport status names. |
 | `Linear Issue` | url/text | `externalIssueUrl` | No | Include key text when URL is absent. |
 | `GitHub PR` | url | `pullRequestUrl` | No | Null/empty while not available. |
-| `Repository` | url/text | `Ticket.RepoUrl` | Yes | Existing ticket field, not in Run Passport v0. |
+| `Repository` | url/text | `Ticket.RepoUrl` | Yes | Existing ticket field, not in Run Passport v1. |
 | `Base Branch` | text | `Ticket.BaseBranch` | Yes | Existing ticket field. |
 | `Created At` | date | `createdAt` | Yes | From ticket lifecycle. |
 | `Started At` | date | `startedAt` | No | Empty until run starts. |
@@ -224,11 +224,11 @@ Promotion checklist for `Accepted` pattern entries:
 
 | Identity | Canonical source | Notion representation | Notes |
 | --- | --- | --- | --- |
-| Run | Run Passport v0 | `Run Passport ID`, `Run Passport URL` | Required on lifecycle pages and pattern entries. |
+| Run | Run Passport v1 | `Run Passport ID`, `Run Passport URL` | Required on lifecycle pages and pattern entries. |
 | Ticket | ReplaceMe `Ticket.Id` | `Ticket ID` | Required for traceability even if Linear is absent. |
 | Linear issue | Ticket external issue fields | `Linear Issue` property and `Backlinks` section | Use key and URL when available. |
 | GitHub PR/MR | Ticket `PrUrl` | `GitHub PR` property and `Backlinks` section | Empty until agent produces a PR/MR. |
-| Notion lifecycle page | Document provider response | `notionDocumentId`, `notionDocumentUrl` in future Run Passport enrichment | Do not require in Run Passport v0. |
+| Notion lifecycle page | Document provider response | `notionDocumentId`, `notionDocumentUrl` in future Run Passport enrichment | Do not require in Run Passport v1. |
 | Langfuse trace | Future trace sink | Optional trace URL in `Langfuse Trace Evidence` | Enrichment only; not a required backlink. |
 
 ### Linear rules
@@ -305,7 +305,7 @@ Rules:
 
 **Goal:** Store the Notion lifecycle page reference so Run Passport can return Notion fields and future updates are idempotent.
 
-**Dependencies:** Run Passport v0 from [`../features/run-passport.md`](../features/run-passport.md). Does not require a background worker hook when exposed only through explicit/manual document creation.
+**Dependencies:** Run Passport v1 from [`../features/run-passport.md`](../features/run-passport.md). Does not require a background worker hook when exposed only through explicit/manual document creation.
 
 **Files:**
 

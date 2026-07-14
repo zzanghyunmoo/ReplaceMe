@@ -20,10 +20,15 @@
 export BASE_URL=http://localhost:8080
 ```
 
-알림 없이 로컬에서 승인 row만 확인하려면 notifier를 `None`으로 둡니다.
+Host API/worker의 notifier를 `None`으로 둘 수 있지만, 이 값은 agent container의
+Approval MCP에 전달되지 않습니다. 직접 seed한 row의 API 상태 전이만 확인할 때는
+notifier를 호출하지 않습니다. Full agent 무알림 QA에서는 Slack 값도 비웁니다.
 
 ```env
 DEVAUTOMATION_Notifier__Provider=None
+DEVAUTOMATION_Slack__BotToken=
+DEVAUTOMATION_Slack__SigningSecret=
+DEVAUTOMATION_Slack__ChannelId=
 ```
 
 Slack 버튼까지 확인하려면 [`05-slack-integration.md`](./05-slack-integration.md)를 먼저
@@ -141,8 +146,9 @@ watch -n 2 "curl -s $BASE_URL/api/approvals?status=Pending&page=1&pageSize=20 | 
 
 - ticket 상태가 `WaitingApproval`로 바뀝니다.
 - `/api/approvals?status=Pending`에 새 approval request가 나타납니다.
-- notifier가 `None`이면 `slackMessageTs`가 `not-configured` 계열일 수 있습니다.
-- Slack을 켰다면 Slack channel에 승인/거절 버튼 메시지가 나타납니다.
+- Slack 설정이 비어 있으면 agent는 DB polling을 계속하며 Slack message reference는
+  `not-configured` 계열일 수 있습니다.
+- Slack을 설정했다면 Slack channel에 승인/거절 버튼 메시지가 나타납니다.
 
 ## APPROVAL-004. 수동 승인
 
@@ -198,14 +204,24 @@ curl -i -s -X POST "$BASE_URL/api/approvals/$APPROVAL_ID/approve"
 
 ## APPROVAL-007. Timeout 확인
 
-빠르게 timeout을 확인하려면 `.env`에서 timeout을 짧게 설정하고 API를 재시작합니다.
+빠르게 timeout을 확인하려면 `.env`에서 timeout을 짧게 설정합니다. 이 값은 worker가
+새 agent container에 전달하고 Approval MCP가 그 container 안에서 읽으므로, API만
+재시작해서는 반영되지 않습니다.
 
 ```env
 DEVAUTOMATION_Approval__ApprovalTimeout=00:00:10
 DEVAUTOMATION_Approval__PollInterval=00:00:01
 ```
 
-Pending approval을 만든 뒤 아무 응답도 하지 않습니다.
+worker를 재생성하고 **새 agent run**에서 Pending approval을 만든 뒤 아무 응답도
+하지 않습니다.
+
+```bash
+docker compose up -d --no-deps --force-recreate worker
+```
+
+직접 seed한 row만으로는 ApprovalService polling loop가 시작되지 않으므로 timeout
+end-to-end 판정에 사용하지 않습니다.
 
 기대 결과:
 

@@ -3,9 +3,15 @@
 ## 무엇을 하는 기능인가
 
 Claude Code가 민감한 작업을 수행하려고 할 때 `approval_prompt` MCP tool을
-호출하면 ReplaceMe가 active notifier(Slack/Gmail/None)에 승인 요청을 만들고,
-사용자가 승인/거절하거나 timeout될 때까지 대기한 뒤 Claude Code permission prompt
+호출하면 ReplaceMe가 승인 요청을 저장하고 notifier로 알림을 시도합니다. Host의
+Ticket notifier는 Slack/Gmail/None을 지원하지만, agent container의 Approval MCP는
+현재 provider/Gmail 설정을 전달받지 않아 Slack 기본값을 사용합니다. 사용자가
+승인/거절하거나 timeout될 때까지 대기한 뒤 Claude Code permission prompt
 규격의 JSON 응답을 반환합니다.
+
+> 수동 승인·거절 API에는 아직 인증/인가가 없습니다. trusted local 환경에서만
+> 사용합니다. `Notifier=None`이나 Gmail 선택은 agent container Approval MCP에
+> 전파되지 않습니다. 무알림 QA에서는 Slack token/channel도 비웁니다.
 
 ## 한눈에 보기
 
@@ -28,7 +34,7 @@ sequenceDiagram
     participant Tool as approval_prompt
     participant Service as ApprovalService
     participant DB as PostgreSQL
-    participant Notifier as Active notifier
+    participant Notifier as Slack default in agent container
 
     Claude->>MCP: permission prompt tool call
     MCP->>Tool: approval_prompt(args)
@@ -128,12 +134,13 @@ stateDiagram-v2
 
 ## 확인 방법
 
-1. `.env`에서 `DEVAUTOMATION_Notifier__Provider`를 선택합니다. Slack 승인 버튼을
-   쓰려면 Slack bot token, signing secret, channel id를 설정합니다.
+1. Agent Approval MCP 알림을 쓰려면 Slack bot token, signing secret, channel id를
+   설정합니다. Host의 notifier provider 선택은 agent container에 전파되지 않습니다.
 2. `docker compose --profile build-only build agent-image`로 MCP가 포함된
    agent image를 빌드합니다.
 3. 티켓을 생성해 agent가 민감 작업을 요청하게 합니다.
-4. active notifier에 승인 요청이 전달되는지 확인합니다.
+4. Slack을 설정했다면 승인 요청이 전달되는지 확인합니다. 설정하지 않았다면 DB polling
+   과 수동 승인 API로 결정되는지 확인합니다.
 5. 승인/거절 또는 timeout 후 `/api/approvals`에서 상태를 조회합니다.
 
 기대 결과:
@@ -146,7 +153,7 @@ stateDiagram-v2
 실패하면 먼저 볼 곳:
 
 - `/api/approvals`
-- active notifier 로그
+- agent container의 Approval MCP/Slack 로그
 - `ApprovalRequest.ResponseReason`
 
 ## 현재 한계
@@ -155,3 +162,8 @@ stateDiagram-v2
 - 수동 거절 API는 사유를 받을 수 있지만, 승인 요청 입력을 수정하지는 않습니다.
 - approval request의 `updatedInput` 수정 UI는 아직 없습니다. 승인 시 원래
   input을 그대로 반환합니다.
+- MCP 설정은 제공되지만 coding agent가 모든 민감 작업에서 반드시
+  `approval_prompt`를 호출하도록 강제하는 별도 policy/hook은 없습니다.
+- Agent container에는 `DEVAUTOMATION_Notifier__Provider`와 Gmail 설정이 전달되지
+  않습니다. 현재 Approval MCP는 기본 Slack provider를 사용하며, Slack 설정이 비면
+  알림 없이 DB polling/API 결정 경로만 사용할 수 있습니다.

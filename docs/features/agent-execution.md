@@ -101,7 +101,9 @@ flowchart TD
 
 ## 실행 격리와 secret 경계
 
-현재 runner는 host Docker socket을 사용해 agent container를 만듭니다. 이 방식은
+현재 runner는 host Docker socket을 사용해 agent container를 만듭니다. Docker socket
+접근은 host 권한에 준하며, agent container 자체에도 아직 CPU/memory/PID,
+read-only filesystem, Linux capability 제한이 없습니다. 이 방식은
 trusted local development 전용입니다. `Agent:AllowLocalDockerSocket=true`로 명시적으로
 켜야 하며, `Agent:ExecutionIsolationProfile=ProductionLike` 또는 Production/Staging
 환경에서는 `Agent:AllowLocalDockerSocketInProductionLike=true`가 없으면 readiness와
@@ -138,7 +140,8 @@ docker compose up --build api worker postgres kafka
    원본 offset을 commit합니다.
 6. attempts가 소진되거나 JSON/ticket id가 잘못된 poison message는
    `Queue:KafkaDlqTopic`에 sanitized failure context와 함께 publish한 뒤 commit합니다.
-7. 성공 시 티켓은 `Completed`가 되고 PR/MR URL이 저장됩니다.
+7. Container exit code 0이면 티켓은 `Completed`가 됩니다. Agent가 반환한 경우에만
+   PR/MR URL이 저장됩니다.
 8. agent 실행 결과 실패 시 티켓은 `Failed`가 되고 `FailReason`과 execution log를 확인할 수
    있습니다. Kafka attempts 소진으로 DLQ에 들어간 기존 ticket도 `Failed`로 기록됩니다.
 
@@ -156,3 +159,9 @@ docker compose up --build api worker postgres kafka
 - local Docker socket runner는 명시적 opt-in, readiness 경고/차단, runner 실행 전 guard로
   보호하지만 운영 등급 격리 runner 자체는 아직 없습니다.
 - Gmail notifier는 Gmail API access token 갱신을 자체 처리하지 않습니다.
+- Container exit code 0은 변경, test 통과, PR 생성까지 보장하지 않습니다. PR URL과
+  diff/test evidence를 별도로 확인합니다.
+- DB save와 Kafka publish는 원자적이지 않아 publish 실패 뒤 Pending ticket이 남을
+  수 있으며 자동 reconciler는 없습니다.
+- Agent container에는 notifier provider와 Gmail 설정이 전달되지 않아 Approval MCP는
+  현재 Slack 기본값을 사용합니다.

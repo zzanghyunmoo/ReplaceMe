@@ -118,14 +118,17 @@ DEVAUTOMATION_Agent__DockerSocketMode=LocalDockerSocket
 DEVAUTOMATION_Agent__AllowLocalDockerSocket=true
 DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike=false
 DEVAUTOMATION_Notifier__Provider=None
+# Agent container Approval MCP는 provider 선택을 전달받지 않으므로 Slack 값도 비웁니다.
+DEVAUTOMATION_Slack__BotToken=
+DEVAUTOMATION_Slack__SigningSecret=
+DEVAUTOMATION_Slack__ChannelId=
 DEVAUTOMATION_ProfileReadiness__SelectedProfile=
 ```
 
-API와 worker를 재시작합니다.
+Broker evidence를 보존한 채 API와 worker만 build/recreate합니다.
 
 ```bash
-docker compose down
-docker compose up --build api worker postgres kafka
+docker compose up -d --build --force-recreate api worker
 ```
 
 ## AGENT-005. 성공 경로 full run
@@ -170,58 +173,25 @@ curl -s "$BASE_URL/api/tickets/$AGENT_OK_TICKET_ID/logs?page=1&pageSize=200" | j
 - Anthropic/GitHub/GitLab/Slack/Jira/Linear/Gmail/Notion/Confluence/Langfuse/LiteLLM
   secret 원문이 보이면 실패입니다.
 - secret은 `[REDACTED]`로 보여야 합니다.
+- redaction은 agent stream 중심이므로 API/worker file log와 Compose stdout도 함께
+  검사합니다.
 
-추가 secret scan은 실제 `.env`에 설정된 secret 값을 기준으로 수행합니다. 아래 스크립트는
-secret 원문을 출력하지 않고, 어떤 환경변수 이름이 log에서 발견됐는지만 표시합니다.
-
-```bash
-curl -s "$BASE_URL/api/tickets/$AGENT_OK_TICKET_ID/logs?page=1&pageSize=500" \
-  > /tmp/replaceme-agent-logs.json
-
-python3 - <<'PY'
-from pathlib import Path
-
-log_text = Path('/tmp/replaceme-agent-logs.json').read_text(errors='ignore')
-log_text += '\n' + '\n'.join(
-    p.read_text(errors='ignore') for p in Path('logs').glob('devautomation-*.log')
-)
-secret_keys = [
-    'DEVAUTOMATION_Agent__AnthropicApiKey',
-    'DEVAUTOMATION_Agent__GitHubToken',
-    'DEVAUTOMATION_Agent__GitLabToken',
-    'DEVAUTOMATION_Slack__BotToken',
-    'DEVAUTOMATION_Slack__SigningSecret',
-    'DEVAUTOMATION_Linear__ApiKey',
-    'DEVAUTOMATION_Notion__ApiToken',
-    'DEVAUTOMATION_Jira__ApiToken',
-    'DEVAUTOMATION_Confluence__ApiToken',
-    'DEVAUTOMATION_Langfuse__PublicKey',
-    'DEVAUTOMATION_Langfuse__SecretKey',
-    'DEVAUTOMATION_LiteLLM__ApiKey',
-    'DEVAUTOMATION_LiteLLM__VirtualKey',
-]
-values = {}
-for line in Path('.env').read_text(errors='ignore').splitlines():
-    if not line or line.lstrip().startswith('#') or '=' not in line:
-        continue
-    key, value = line.split('=', 1)
-    if key in secret_keys and len(value.strip()) >= 8:
-        values[key] = value.strip()
-leaked = [key for key, value in values.items() if value in log_text]
-if leaked:
-    print('SECRET LEAK keys:', ', '.join(leaked))
-    raise SystemExit(1)
-print('no configured secret values found in logs')
-PY
-```
-
-패턴 기반 보조 검사도 함께 실행합니다.
+추가 secret scan은 실제 `.env`에 설정된 secret 값을 기준으로 수행합니다. 공통 스크립트는
+secret 원문을 출력하지 않고, 발견된 환경변수 이름 또는 token pattern 종류만 표시합니다.
 
 ```bash
-grep -R -E "(ghp_|github_pat_|glpat-|sk-ant-|xox[baprs]-|xapp-)" logs \
-  && echo "SECRET-LIKE PATTERN FOUND" \
-  || echo "no common secret-like pattern in file logs"
+python3 scripts/scan-local-secret-leaks.py \
+  --base-url "$BASE_URL" \
+  --ticket-id "$AGENT_OK_TICKET_ID"
 ```
+
+이 검사는 execution log endpoint를 마지막 page까지 조회하고 JSON의 decoded `Content`를
+API/worker file log 및 Compose stdout과 합쳐 검사합니다. 임시 저장소는 예측 불가능한
+경로에 `0700`으로 만들고 파일은 `0600`으로 제한하며, 성공·실패와 관계없이 정리합니다.
+configured secret 값, common GitHub/GitLab/Anthropic/Slack token pattern, 입력 및 local log
+surface 검증 중 하나라도 실패하면 nonzero로 종료합니다. 이는 현재 local execution/file/
+Compose log surface 검사이며 외부 관측 sink나 파생·인코딩된 secret의 부재까지 증명하지는
+않습니다.
 
 ## AGENT-007. agent container secret allowlist spot check
 
@@ -241,6 +211,9 @@ docker inspect \
 - GitLab provider run이면 `GITLAB_TOKEN`은 있을 수 있지만 `GITHUB_TOKEN`은 없어야 합니다.
 - 현재 direct Claude Code path는 `ANTHROPIC_API_KEY`만 사용합니다.
 - Langfuse/LiteLLM secret은 redaction 대상이지만 기본 agent container env에는 없어야 합니다.
+- Slack 외 notifier를 선택한 Approval MCP full E2E는 현재 별도 검증이 필요합니다.
+  agent container의 notifier 환경 전달이 선택한 provider를 완전히 보존한다고 가정하지
+  않습니다.
 
 ## AGENT-008. readiness gate safety net 확인
 
@@ -251,11 +224,11 @@ docker inspect \
 절차:
 
 1. `.env`에서 `DEVAUTOMATION_ProfileReadiness__SelectedProfile=`처럼 pre-run gate를 끕니다.
-2. worker 없이 API/DB/Kafka만 시작합니다.
+2. Broker state를 보존하면서 worker만 멈추고 API/DB/Kafka를 유지합니다.
 
    ```bash
-   docker compose down
-   docker compose up --build api postgres kafka
+   docker compose stop worker || true
+   docker compose up -d --build api postgres kafka
    ```
 
 3. ticket을 생성해 Kafka에 job을 enqueue합니다. worker가 꺼져 있으므로 ticket은 보통 `Pending`에 머뭅니다.
@@ -263,7 +236,7 @@ docker inspect \
 5. worker만 시작합니다.
 
    ```bash
-   docker compose up --build worker
+   docker compose up -d --build worker
    ```
 
 관측 포인트:
@@ -287,21 +260,32 @@ worker는 agent job message 본문에 `Attempt`, `LastFailureReason`, `LastFaile
 docker compose config --quiet
 ```
 
-Redpanda가 떠 있는 환경에서 poison message DLQ 동작을 수동 확인하려면 다음처럼 잘못된
-payload를 agent job topic에 넣고 DLQ topic에서 소비합니다.
+Redpanda가 떠 있는 환경에서 고유 marker를 포함한 invalid payload를 publish합니다.
+Worker log에서 해당 message의 DLQ publish를 확인한 뒤 DLQ의 최신 record와 marker를
+대조합니다.
 
 ```bash
-docker compose exec kafka rpk topic produce devautomation.agent-jobs <<'EOF'
-not-json
-EOF
+export DLQ_MARKER="qa-poison-$(date +%s)"
+printf 'not-json-%s\n' "$DLQ_MARKER" \
+  | docker compose exec -T kafka \
+      rpk topic produce devautomation.agent-jobs
 
-docker compose exec kafka rpk topic consume devautomation.agent-jobs.dlq -n 1
+docker compose logs --no-color --since=1m worker \
+  | grep 'invalid Kafka queue message'
+
+docker compose exec -T kafka \
+  rpk topic consume devautomation.agent-jobs.dlq \
+  -o -1 -n 1 --format '%v\n' \
+  | tee /tmp/replaceme-dlq-latest.json
+
+grep -F "$DLQ_MARKER" /tmp/replaceme-dlq-latest.json >/dev/null
 ```
 
 기대 결과:
 
 - worker log에 invalid Kafka queue message가 DLQ로 publish됐다는 warning이 남습니다.
-- DLQ payload에는 source topic/partition/offset, sanitized original value, failure reason이 있습니다.
+- 최신 DLQ payload의 sanitized original value에 `$DLQ_MARKER`가 있습니다.
+- DLQ payload에는 source topic/partition/offset과 failure reason도 있습니다.
 - DLQ publish가 실패하면 worker는 원본 offset을 commit하지 않고 reconnect loop에서 다시 시도합니다.
 
 ## 완료 체크리스트

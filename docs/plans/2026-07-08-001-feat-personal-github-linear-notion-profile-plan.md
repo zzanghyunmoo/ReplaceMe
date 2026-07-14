@@ -128,7 +128,8 @@ For personal automation, late discovery is expensive: a coding agent may spend t
 - A new reader can explain what `personal-github-linear-notion` guarantees without reading implementation code.
 - A planner can derive a Provider Doctor implementation plan without inventing which tools are checked or where results appear.
 - The profile makes unsafe execution states visible before an agent can change code.
-- The Notion design note and Linear ZZA-51 can both point to this document as the canonical v1 requirements source.
+- The canonical [Notion design note](https://app.notion.com/p/397ef22ad4fc81d5a84bd4dbcbb62faf)
+  and Linear ZZA-51 can point to this immutable local requirements/implementation record.
 
 ### Scope Boundaries
 
@@ -562,7 +563,7 @@ DEVAUTOMATION_ProfileReadiness__Checks__SecretsRedactionSeverity=warning
 - `docs/features/local-operations.md` — add readiness doctor and failure examples.
 - `docs/features/ticket-management.md` — mention pre-run gate behavior.
 - `docs/features/persistence-observability.md` — mention readiness report surfaces if logs/records are added.
-- `docs/plans/2026-07-08-001-feat-personal-github-linear-notion-profile-plan.md` — keep as the canonical implementation plan, not a mutable status tracker.
+- `docs/plans/2026-07-08-001-feat-personal-github-linear-notion-profile-plan.md` — keep as an immutable local implementation record synchronized from the canonical Notion design, not a mutable status tracker.
 
 **Approach:**
 

@@ -7,10 +7,15 @@
 <!-- markdownlint-disable MD013 -->
 | 종류 | 먼저 볼 문서 | 목적 |
 | --- | --- | --- |
+| 아키텍처 | [`architecture.md`](./architecture.md) | 현재 런타임, 신뢰·데이터 경계, 다음 진화 방향을 봅니다. |
 | 기능 현황 | [`features/feature-status.md`](./features/feature-status.md) | 현재 구현된 기능과 전체 흐름을 한눈에 봅니다. |
 | 기능 설명 | [`features/`](./features/) | 기능별로 “무엇을 하는지”와 “로직이 어떻게 흐르는지”를 봅니다. |
+| 티켓 이력 | [`ticket-work-history.md`](./ticket-work-history.md) | Linear 티켓별 계획·코드·문서·검증의 추적성을 봅니다. |
+| 운영자 가이드 | [`guides/operator-guide.md`](./guides/operator-guide.md) | 실행, 보안, 장애 대응, 데이터 보존을 봅니다. |
+| 사용자 가이드 | [`guides/user-guide.md`](./guides/user-guide.md) | Ticket 작성부터 결과 확인까지 따라갑니다. |
+| KB | [`kb/README.md`](./kb/README.md) | 반복 적용할 학습과 실수 방지 규칙을 봅니다. |
 | QA 실 테스트 | [`qa/`](./qa/) | 로컬 실행부터 기능 단위 수동 테스트 체크리스트를 봅니다. |
-| 구현 계획 | [`plans/`](./plans/) | 아직 만들 기능을 어떤 순서로 개발할지 봅니다. |
+| 구현 계획 | [`plans/`](./plans/) | 완료된 결정과 backlog 구현 순서를 함께 봅니다. |
 | 아이디에이션 | [`ideation/`](./ideation/) | 왜 이 방향을 선택했는지 배경을 봅니다. |
 | HTML 요약 | [`feature-overview.html`](./feature-overview.html) | 전체 기능을 시각적으로 빠르게 훑습니다. |
 <!-- markdownlint-enable MD013 -->
@@ -18,12 +23,17 @@
 ## 빠른 보기
 
 <!-- markdownlint-disable MD013 -->
+- [`architecture.md`](./architecture.md) — 현재 시스템 아키텍처와 신뢰·데이터 경계
 - [`features/feature-status.md`](./features/feature-status.md) — 현재 기능 지도와
   초보자용 용어 풀이
+- [`ticket-work-history.md`](./ticket-work-history.md) — ZZA-50~68 상태와 산출물
+- [`guides/operator-guide.md`](./guides/operator-guide.md) — 실행·QA·트러블슈팅
+- [`guides/user-guide.md`](./guides/user-guide.md) — 사용 흐름과 안전 수칙
+- [`kb/README.md`](./kb/README.md) — 지금까지 검증한 핵심 학습
 - [`feature-overview.html`](./feature-overview.html) — 전체 기능을 한 화면에서
   보는 HTML 요약
-- [`pr-2-5-feature-summary.html`](./pr-2-5-feature-summary.html) — 분할 PR #2-#5
-  기능과 배포 순서 요약
+- [`pr-2-5-feature-summary.html`](./pr-2-5-feature-summary.html) — PR #2-#5 시점의
+  historical snapshot
 - [`features/ticket-management.md`](./features/ticket-management.md) — 티켓 API와
   상태 전이
 - [`features/agent-execution.md`](./features/agent-execution.md) — Kafka/Docker
@@ -36,10 +46,12 @@
   PostgreSQL 모델, 로그, redaction
 - [`features/local-operations.md`](./features/local-operations.md) — 로컬 실행,
   설정, 헬스체크
+- [`features/external-providers.md`](./features/external-providers.md) — provider 선택,
+  지원 범위, 미검증 경계
 - [`features/readiness-profile.md`](./features/readiness-profile.md) — ZZA-51
   `personal-github-linear-notion` readiness profile
-- [`features/run-passport.md`](./features/run-passport.md) — Run Passport v0
-  summary contract
+- [`features/run-passport.md`](./features/run-passport.md) — Run Passport v1
+  ticket-scoped summary contract
 - [`qa/README.md`](./qa/README.md) — 로컬 실행부터 기능별 실 테스트를 진행하는
   QA 문서 목차
 - [`plans/2026-07-08-001-feat-personal-github-linear-notion-profile-plan.md`](./plans/2026-07-08-001-feat-personal-github-linear-notion-profile-plan.md) —
@@ -57,10 +69,16 @@
 ## 현재 구현 범위
 
 ReplaceMe는 지금 “요구사항 티켓 → Kafka 큐 → 격리 컨테이너에서 코딩 에이전트
-실행 → 필요 시 notifier 승인 → 로그/상태 저장 → Run Passport v0 요약 조회”의
+실행 → 필요 시 notifier 승인 → 로그/상태 저장 → Run Passport v1 요약 조회”의
 핵심 수직 흐름을 갖춘 상태입니다.
 
-아직 웹 UI, API 인증, run replay, 운영 배포 설정은 v1 범위 밖입니다.
+아직 웹 UI, API 인증/인가, run replay, transactional outbox, persistent broker,
+운영 배포 설정은 v1 범위 밖입니다. 현재 Compose는 host Docker socket을 사용하는
+trusted single-user local development 전용입니다.
+
+Notion 프로젝트 위키가 정보 구조와 본문의 canonical source입니다. 로컬 문서는
+코드 리뷰와 Git 이력을 위한 동기화 사본이며, 상태가 다르면 코드·Linear·Notion을
+다시 대조합니다.
 
 ## 용어 빠른 풀이
 

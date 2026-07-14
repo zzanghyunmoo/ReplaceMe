@@ -18,7 +18,7 @@ execution: design
 | Field | Value |
 | --- | --- |
 | Objective | Design the first implementation-ready PR review packet contract for ReplaceMe so agent-created GitHub PRs carry consistent review context, validation evidence, Run Passport links, and later Notion/Langfuse backlinks. |
-| Product authority | Linear ZZA-55, "GitHub PR 리뷰 패킷 설계", grounded in the existing ReplaceMe repo and Run Passport v0 contract. |
+| Product authority | Linear ZZA-55, "GitHub PR 리뷰 패킷 설계", grounded in the existing ReplaceMe repo and Run Passport v1 contract. |
 | Execution profile | Design ticket; do not implement the generator in this slice. |
 | Stop conditions | Stop before building Notion lifecycle documents, Langfuse traces, full evidence persistence, rerun lineage, or provider-specific PR/MR API rewrites beyond the interface needed by this design. |
 | Tail ownership | A later implementation ticket owns generator code, tests, provider adapter changes, and rollout. |
@@ -31,7 +31,7 @@ execution: design
 
 ReplaceMe already creates a branch and a GitHub PR or GitLab MR at the end of an agent run, but the current change-request body is only a one-line automation note. Reviewers need a repeatable packet that explains the problem, summarizes the change, lists validation evidence, calls out missing evidence and residual risk, and links back to the execution record. ZZA-55 defines that packet as a provider-neutral Markdown contract with a GitHub-first publication path.
 
-The packet must consume [`Run Passport v0`](../features/run-passport.md) as the canonical run identity and link shape. It must also reserve fields for the ZZA-52 Notion lifecycle document and later Langfuse trace links without designing those systems here.
+The packet must consume [`Run Passport v1`](../features/run-passport.md) as the canonical run identity and link shape. It must also reserve fields for the ZZA-52 Notion lifecycle document and later Langfuse trace links without designing those systems here.
 
 ### Problem Frame
 
@@ -55,7 +55,7 @@ The existing workspace PR/MR body convention is a Korean four-section body: prob
 
 **Run and backlink fields**
 
-- R4. The packet must include `runPassportId`, `runPassportUrl`, `runPassportContractVersion`, `ticketId`, `ticketTitle`, `issueTracker`, `externalIssueKey`, and `externalIssueUrl` from Run Passport v0.
+- R4. The packet must include `runPassportId`, `runPassportUrl`, `runPassportContractVersion`, `ticketId`, `ticketTitle`, `issueTracker`, `externalIssueKey`, and `externalIssueUrl` from Run Passport v1.
 - R5. The packet must include nullable Notion backlink fields named `notionDocumentId` and `notionDocumentUrl`, sourced only from the ZZA-52 interface when available.
 - R6. The packet must reserve a nullable `langfuseTraceUrl` field for ZZA-60 or a later AI-observability integration.
 - R7. The packet must not duplicate the ZZA-52 Notion page schema or lifecycle-state design. It only requires ZZA-52 to expose a ticket/run-scoped document reference.
@@ -120,7 +120,7 @@ The first packet contract version should be:
 pr-review-packet/v0
 ```
 
-The packet contract version is independent from Run Passport's `run-passport-summary/v0`. The PR body should show both values so reviewers can identify which renderer and which run-summary shape were used.
+The packet contract version is independent from Run Passport's `run-passport-summary/v1`. The PR body should show both values so reviewers can identify which renderer and which run-summary shape were used.
 
 ### Input model
 
@@ -268,7 +268,7 @@ ZZA-52 may implement this through any storage or provider-specific mechanism. ZZ
 
 Current relevant files:
 
-- `src/DevAutomation.Core/Contracts/RunPassportContracts.cs` exposes Run Passport v0.
+- `src/DevAutomation.Core/Contracts/RunPassportContracts.cs` exposes Run Passport v1.
 - `src/DevAutomation.Infrastructure/RemoteRepositories/IRemoteRepositoryIntegration.cs` abstracts provider-specific change-request creation.
 - `src/DevAutomation.Infrastructure/RemoteRepositories/GitHubRemoteRepositoryIntegration.cs` creates GitHub PRs with `gh pr create` and a one-line body.
 - `src/DevAutomation.Infrastructure/RemoteRepositories/GitLabRemoteRepositoryIntegration.cs` creates GitLab MRs through the GitLab API and a one-line description.
@@ -278,7 +278,7 @@ Current relevant files:
 
 ```mermaid
 flowchart LR
-  Passport[Run Passport v0] --> Builder[PR Review Packet Builder]
+  Passport[Run Passport v1] --> Builder[PR Review Packet Builder]
   Evidence[Structured validation evidence] --> Builder
   Notion[ZZA-52 document reference] -. optional .-> Builder
   Langfuse[ZZA-60 trace URL] -. optional .-> Builder
@@ -403,7 +403,7 @@ git diff --check
 
 ### U3. Wire packet inputs into the agent completion flow
 
-**Goal:** Generate the packet at change-request creation time using Run Passport v0 and the best available structured evidence.
+**Goal:** Generate the packet at change-request creation time using Run Passport v1 and the best available structured evidence.
 
 **Requirements:** R4-R14.
 
@@ -468,7 +468,7 @@ git diff --check
 
 ## Dependencies and Sequencing
 
-1. **Already available:** Run Passport v0 contract from [`2026-07-09-001-feat-run-passport-minimal-contract-plan.md`](./2026-07-09-001-feat-run-passport-minimal-contract-plan.md) and [`../features/run-passport.md`](../features/run-passport.md).
+1. **Already available:** Run Passport v1 contract from [`2026-07-09-001-feat-run-passport-minimal-contract-plan.md`](./2026-07-09-001-feat-run-passport-minimal-contract-plan.md) and [`../features/run-passport.md`](../features/run-passport.md).
 2. **Required interface from ZZA-52:** optional lifecycle document reference with `ticketId`, `runPassportId`, `notionDocumentId`, and `notionDocumentUrl`. ZZA-55 must not design or persist Notion pages itself.
 3. **Optional future enrichment from ZZA-60:** `langfuseTraceUrl` or equivalent trace reference.
 4. Implement U1 before provider publication changes so body and state rules are stable.
@@ -490,7 +490,7 @@ If `--no-restore` fails because packages are not restored, run `dotnet restore D
 ## Definition of Done
 
 - The packet renderer outputs the exact four-section Korean template.
-- The renderer includes Run Passport v0 fields and nullable Notion/Langfuse fields.
+- The renderer includes Run Passport v1 fields and nullable Notion/Langfuse fields.
 - Missing evidence is explicit and uses the agreed vocabulary.
 - Draft/ready state is deterministic and test-covered.
 - GitHub publication can create draft or ready PRs with the packet body.
