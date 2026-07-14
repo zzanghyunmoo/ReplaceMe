@@ -4,6 +4,7 @@ using DevAutomation.Core.Options;
 using DevAutomation.Core.Readiness;
 using DevAutomation.Core.Services;
 using DevAutomation.Infrastructure.Agents;
+using DevAutomation.Infrastructure.Notifications;
 using DevAutomation.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -27,7 +28,7 @@ public sealed class AgentJobReplayTests
         var job = new AgentJob(
             dbContext,
             runner,
-            new NoOpTicketNotifier(),
+            new NoOpNotifier(),
             new NoOpIssueTrackerService(),
             new RunnableReadinessService(),
             Options.Create(new ProfileReadinessOptions()),
@@ -58,7 +59,7 @@ public sealed class AgentJobReplayTests
         var job = new AgentJob(
             dbContext,
             runner,
-            new NoOpTicketNotifier(),
+            new NoOpNotifier(),
             new NoOpIssueTrackerService(),
             new RunnableReadinessService(),
             Options.Create(new ProfileReadinessOptions()),
@@ -66,7 +67,8 @@ public sealed class AgentJobReplayTests
             new TicketStateMachine(),
             NullLogger<AgentJob>.Instance);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => job.RunAsync(ticket.Id, deferUnhandledFailureToQueue: true));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            job.RunAsync(ticket.Id, AgentJobFailureHandling.ResetToPendingAndRethrow));
 
         var saved = await dbContext.Tickets.SingleAsync(x => x.Id == ticket.Id);
         Assert.Equal("transient agent exception", exception.Message);
@@ -139,11 +141,6 @@ public sealed class AgentJobReplayTests
         }
 
         public Task StopAsync(Guid ticketId, string? containerId, CancellationToken cancellationToken) => Task.CompletedTask;
-    }
-
-    private sealed class NoOpTicketNotifier : ITicketNotifier
-    {
-        public Task NotifyStatusChangedAsync(Ticket ticket, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class NoOpIssueTrackerService : IIssueTrackerService

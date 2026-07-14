@@ -232,7 +232,7 @@ public sealed class KafkaAgentWorker : BackgroundService
     {
         using var scope = _scopeFactory.CreateScope();
         var job = scope.ServiceProvider.GetRequiredService<AgentJob>();
-        await job.RunAsync(ticketId, deferUnhandledFailureToQueue: true);
+        await job.RunAsync(ticketId, AgentJobFailureHandling.ResetToPendingAndRethrow);
     }
 
     private async Task MarkTicketFailedAfterDlqAsync(

@@ -72,7 +72,7 @@ flowchart TD
 <!-- markdownlint-disable MD013 -->
 | 구분 | 구현됨 | 아직 아님 |
 | --- | --- | --- |
-| 실행 흐름 | 티켓 생성, Kafka enqueue, Docker agent 실행, PR/MR 생성, Run Passport v0 summary | 실패 재시도, DLQ, run replay, full Run Passport persistence |
+| 실행 흐름 | 티켓 생성, Kafka enqueue, bounded retry/DLQ, Docker agent 실행, PR/MR 생성, Run Passport v0 summary | run replay, full Run Passport persistence |
 | 승인 | Approval MCP, Slack 버튼 승인/거절, 수동 승인 API | 승인 입력 수정 UI, 거절 사유 modal |
 | 외부 연동 | GitHub/GitLab, Jira/Linear, Notion/Confluence provider 골격, readiness doctor | full end-to-end Linear execution grammar |
 | 운영 | `/health`, readiness profile endpoint, Docker Compose, 로그/telemetry | production manifest, 인증/인가, 운영 hardening |

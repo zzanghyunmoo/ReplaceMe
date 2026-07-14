@@ -220,7 +220,7 @@ curl -s "$BASE_URL/api/readiness/profiles/personal-github-linear-notion" \
 
 ## READY-009. Production-like Docker socket posture는 opt-in 없이는 차단된다
 
-API 또는 worker를 다음처럼 production-like posture로 재시작합니다.
+API readiness endpoint가 새 설정을 읽도록 API를 다음 production-like posture로 재시작합니다.
 
 ```env
 DEVAUTOMATION_Agent__ExecutionIsolationProfile=ProductionLike
@@ -231,7 +231,7 @@ DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike=false
 
 ```bash
 curl -s "$BASE_URL/api/readiness/profiles/personal-github-linear-notion" \
-  | jq '.isRunnable, .checks[] | select(.id == "agent.docker.socket.posture")'
+  | jq '.isRunnable, (.checks[] | select(.id == "agent.docker.socket.posture"))'
 ```
 
 기대 결과:

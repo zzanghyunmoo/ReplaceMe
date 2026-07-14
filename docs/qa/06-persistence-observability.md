@@ -116,7 +116,7 @@ tail -n 100 logs/devautomation-*.log
 
 - API request log가 남습니다.
 - worker/agent 오류가 있으면 stack trace 또는 warning이 남습니다.
-- 로그 파일이 없으면 API container volume mount `./logs:/app/logs`를 확인합니다.
+- 로그 파일이 없으면 API/worker container volume mount `./logs:/app/logs`를 확인합니다.
 
 ## OBS-006. secret redaction 확인
 

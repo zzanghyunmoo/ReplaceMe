@@ -4,6 +4,7 @@
 
 ## 문서 종류
 
+<!-- markdownlint-disable MD013 -->
 | 종류 | 먼저 볼 문서 | 목적 |
 | --- | --- | --- |
 | 기능 현황 | [`features/feature-status.md`](./features/feature-status.md) | 현재 구현된 기능과 전체 흐름을 한눈에 봅니다. |
@@ -12,6 +13,7 @@
 | 구현 계획 | [`plans/`](./plans/) | 아직 만들 기능을 어떤 순서로 개발할지 봅니다. |
 | 아이디에이션 | [`ideation/`](./ideation/) | 왜 이 방향을 선택했는지 배경을 봅니다. |
 | HTML 요약 | [`feature-overview.html`](./feature-overview.html) | 전체 기능을 시각적으로 빠르게 훑습니다. |
+<!-- markdownlint-enable MD013 -->
 
 ## 빠른 보기
 
@@ -58,7 +60,7 @@ ReplaceMe는 지금 “요구사항 티켓 → Kafka 큐 → 격리 컨테이너
 실행 → 필요 시 notifier 승인 → 로그/상태 저장 → Run Passport v0 요약 조회”의
 핵심 수직 흐름을 갖춘 상태입니다.
 
-아직 웹 UI, API 인증, 재시도 정책, 운영 배포 설정은 v1 범위 밖입니다.
+아직 웹 UI, API 인증, run replay, 운영 배포 설정은 v1 범위 밖입니다.
 
 ## 용어 빠른 풀이
 

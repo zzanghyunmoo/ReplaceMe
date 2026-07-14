@@ -275,7 +275,7 @@ docker inspect \
 이 케이스는 readiness profile의 실제 required check 구성에 의존합니다. 로컬 환경이 이미
 runnable이면 의도적으로 credential을 비운 별도 `.env`나 테스트 profile을 사용합니다.
 
-## AGENT-008. Kafka retry/DLQ 설정과 poison message 확인
+## AGENT-009. Kafka retry/DLQ 설정과 poison message 확인
 
 worker는 agent job message 본문에 `Attempt`, `LastFailureReason`, `LastFailedAt`를 저장합니다.
 `Queue:MaxAttempts` 이상 실패한 worker 처리 예외 또는 parsing할 수 없는 poison message는

@@ -34,7 +34,7 @@ The work keeps the current .NET API, PostgreSQL, Redpanda/Kafka, Docker agent ru
 ### Problem Frame
 
 At roadmap creation, ReplaceMe ran the Minimal API and `KafkaAgentWorker` in the same host. As of 2026-07-13, U1 is merged: `DevAutomation.Api` and `DevAutomation.Worker` now run as separate Compose services with a `migrate` one-shot service applying EF Core migrations first. ReplaceMe still persists tickets and execution logs to PostgreSQL, uses Redpanda as a Kafka-compatible broker, and launches Claude Code in Docker containers through `DockerAgentRunner`.
-The app already has OpenTelemetry hooks, Serilog file logs, a readiness profile, and secret redaction, but the compose stack has no OTLP collector or observability backend, Kafka jobs have no bounded retry/DLQ path, and the local runner mounts the host Docker socket.
+As of 2026-07-13, U2/U3/U6 are also merged: Kafka processing failures now have bounded retry/DLQ handling, the local compose stack has an optional OTel Collector/Jaeger/Prometheus observability profile, and local Docker socket execution is guarded by readiness plus runner-level production-like checks. The remaining roadmap focus is AI-run observability and LiteLLM compatibility. Follow-up workflow grammar belongs to ZZA-53 and is not part of this roadmap.
 Langfuse is the right first AI-observability layer because the product's core questions are run quality, prompt/model cost, latency, failure cause, and approval handoff timing.
 LiteLLM is promising as a gateway, but it should remain a spike until Claude Code proxy compatibility, virtual-key delivery, and trace/cost routing are proven.
 
@@ -51,7 +51,7 @@ LiteLLM is promising as a gateway, but it should remain a spike until Claude Cod
 **Runtime separation**
 
 - R1. API serving and agent-job consumption must be runnable as separate processes or services while sharing the same domain and infrastructure registrations.
-- R2. Local Compose must still support a small default stack for development and add optional profiles for worker and observability services.
+- R2. Local Compose must start API, worker, PostgreSQL, and Redpanda as the default core stack; only observability and experimental services such as Langfuse or LiteLLM may require optional profiles.
 
 **Queue reliability**
 
@@ -81,12 +81,12 @@ LiteLLM is promising as a gateway, but it should remain a spike until Claude Cod
 
 ### Acceptance Examples
 
-- AE1. Given only the core profile is enabled, when the operator runs Compose, then API, worker, PostgreSQL, and Redpanda start without requiring Langfuse, LiteLLM, Grafana, or external credentials.
+- AE1. Given the default Compose invocation, when the operator starts the stack, then API, worker, PostgreSQL, and Redpanda start without requiring Langfuse, LiteLLM, Grafana, or external credentials.
 - AE2. Given an agent job repeatedly fails inside worker processing, when retry attempts are exhausted, then the original ticket is marked failed and the final message lands in a configured DLQ topic with the failure reason preserved.
 - AE3. Given telemetry is enabled, when a ticket is created and processed, then API and worker traces flow through the OTLP Collector and can be inspected in the configured local backend.
-- AE4. Given Langfuse is enabled, when an agent run completes or fails, then one trace exists for that ticket with redacted prompt/output metadata and no raw configured secret value.
+- AE4. Given Langfuse is enabled, when an agent run completes or fails, then one trace exists for that immutable `execution_id`, correlated with its ticket, with redacted prompt/output metadata and no raw configured secret value.
 - AE5. Given LiteLLM spike mode is enabled, when the compatibility smoke runs, then the result records whether Claude Code honored the proxy and whether the proxy captured cost/routing data.
-- AE6. Given production-like environment settings, when Docker socket access is not explicitly allowed, then readiness or startup surfaces a clear block/warning instead of silently running with local-only privileges.
+- AE6. Given production-like environment settings, when Docker socket access is not explicitly allowed, then a required readiness failure or startup block prevents agent execution; a warning alone is not sufficient.
 
 ### Scope Boundaries
 
@@ -124,7 +124,19 @@ LiteLLM is promising as a gateway, but it should remain a spike until Claude Cod
 - KTD4. **Keep Langfuse and LiteLLM disabled by default.** Core local development must stay lightweight and must not require external AI observability or proxy services.
 - KTD5. **Gate LiteLLM behind a spike.** LiteLLM's gateway features matter only if Claude Code can reliably route through it and if agent containers can receive scoped virtual keys instead of provider keys.
 - KTD6. **Redaction happens before every external observation sink.** Execution logs, OTel attributes, Langfuse events, and LiteLLM-related diagnostics must share the same secret catalog/redaction posture.
-- KTD7. **Treat Docker socket execution as local-only until hardened.** The current runner remains useful for local development, but production-like modes need explicit opt-in, readiness warnings, and a migration path toward isolated runners.
+- KTD7. **Treat Docker socket execution as local-only until hardened.** The current runner remains useful for local development, but production-like modes need explicit opt-in and a required readiness failure or startup block, plus a migration path toward isolated runners.
+
+### OTel and Langfuse Decision Record
+
+- **Decision:** Keep OTel as the required service/runtime telemetry path and adopt optional Langfuse only for AI-run questions that the OTel baseline does not answer cleanly: prompt/model version, token/cost data, approval wait, and run-quality outcome. Do not send the same raw prompt or output to both systems.
+- **Adopt Langfuse when:** a smoke run correlates one immutable execution id across OTel and Langfuse, Langfuse answers at least one of those AI-specific questions from allowlisted metadata, disabled mode causes no execution change, and redaction tests plus payload inspection find no configured secret or unapproved raw content.
+- **Hold Langfuse when:** correlation is missing or ambiguous, its useful fields merely duplicate the OTel baseline, disabled mode changes execution, delivery failure affects ticket outcome, or inspection finds a secret or raw content without explicit capture authorization. A hold leaves OTel as the sole telemetry system until the failed criterion is corrected and rerun.
+
+### Minimal Trace Identity and Delivery Semantics
+
+- Each accepted agent execution has one immutable, opaque `execution_id` generated before runner launch and carried in queue retry metadata, OTel attributes, Langfuse metadata, and sanitized logs. `ticket_id` is correlation context, not the execution identity.
+- A transport retry retains the same `execution_id` and attempt metadata. A duplicate delivery with that id must not launch a second container; it may add a duplicate-receipt event to the existing correlation. Existing ticket terminal-state/idempotency checks remain the behavior guard.
+- An explicit operator replay is a new execution and receives a new `execution_id`; when available, it carries only an optional `replay_of_execution_id` link to the prior execution. This roadmap does not add durable replay lineage or full Run Passport persistence.
 
 ### High-Level Technical Design
 
@@ -151,7 +163,8 @@ flowchart LR
   U1 --> U3[U3 OTel collector profile]
   U2 --> U4[U4 Langfuse traces]
   U3 --> U4
-  U4 --> U5[U5 LiteLLM spike]
+  Identity[Stable run identity + redaction baseline] --> U5[U5 LiteLLM spike]
+  U4 -. only if full trace output is required .-> U5
   U1 --> U6[U6 Agent hardening]
   U2 --> U6
 ```
@@ -162,7 +175,7 @@ flowchart LR
 2. Add queue retry/DLQ before increasing agent throughput.
 3. Add OTel collector and local dashboards for service-level visibility.
 4. Add Langfuse for AI-run traces once run identity and redaction boundaries are stable.
-5. Run the LiteLLM compatibility spike after Langfuse can observe direct execution baseline behavior.
+5. Run the LiteLLM compatibility spike once stable run identity and the redaction baseline are available; require full U4 output only when a named spike experiment explicitly needs Langfuse evidence.
 6. Harden the agent boundary in parallel with or immediately after retry/DLQ work.
 
 ### Project Tracking and Roadmap
@@ -173,19 +186,19 @@ flowchart LR
 | Unit | Issue | Priority | Status | Intent |
 | --- | --- | --- | --- | --- |
 | U1 | [ZZA-59](https://linear.app/zzanghyunmoo/issue/ZZA-59/api와-worker-런타임-분리) | Medium | Done | API and worker runtime split. |
-| U2 | [ZZA-61](https://linear.app/zzanghyunmoo/issue/ZZA-61/kafka-재시도와-dlq-처리-추가) | High | Next | Kafka retry and DLQ behavior. |
-| U3 | [ZZA-62](https://linear.app/zzanghyunmoo/issue/ZZA-62/opentelemetry-collector-기반-로컬-관측성-프로필-추가) | Medium | Next | OTel Collector local observability profile. |
-| U4 | [ZZA-60](https://linear.app/zzanghyunmoo/issue/ZZA-60/langfuse-ai-실행-trace-연동) | Medium | Blocked by U2/U3/U6 | Langfuse AI-run tracing. |
-| U5 | [ZZA-63](https://linear.app/zzanghyunmoo/issue/ZZA-63/litellm-proxy-호환성-spike) | Low | Spike after U4 baseline | LiteLLM proxy compatibility spike. |
-| U6 | [ZZA-64](https://linear.app/zzanghyunmoo/issue/ZZA-64/agent-실행-격리와-secret-경계-hardening) | High | Next | Agent isolation and secret boundary hardening. |
+| U2 | [ZZA-61](https://linear.app/zzanghyunmoo/issue/ZZA-61/kafka-재시도와-dlq-처리-추가) | High | Done | Kafka retry and DLQ behavior. |
+| U3 | [ZZA-62](https://linear.app/zzanghyunmoo/issue/ZZA-62/opentelemetry-collector-기반-로컬-관측성-프로필-추가) | Medium | Done | OTel Collector local observability profile. |
+| U4 | [ZZA-60](https://linear.app/zzanghyunmoo/issue/ZZA-60/langfuse-ai-실행-trace-연동) | Medium | Ready after U2/U3/U6 | Langfuse AI-run tracing. |
+| U5 | [ZZA-63](https://linear.app/zzanghyunmoo/issue/ZZA-63/litellm-proxy-호환성-spike) | Low | Spike after identity/redaction baseline | LiteLLM proxy compatibility spike. |
+| U6 | [ZZA-64](https://linear.app/zzanghyunmoo/issue/ZZA-64/agent-실행-격리와-secret-경계-hardening) | High | Done | Agent isolation and secret boundary hardening. |
 
 | Existing issue | Relationship to this plan | Execution guidance |
 | --- | --- | --- |
 | [ZZA-58](https://linear.app/zzanghyunmoo/issue/ZZA-58/replaceme-net-9-로컬-빌드-경로-정렬) | Historical precondition for U1. | No longer blocking after ZZA-59 merge. |
-| [ZZA-52](https://linear.app/zzanghyunmoo/issue/ZZA-52/notion-작업-문서와-패턴-뱅크-설계) | Consumes Run Passport v0 and later Langfuse evidence. | Design plan is done; automation hooks can now build on the merged API/worker split, but should still wait for retry/DLQ when background publishing is automatic. |
+| [ZZA-52](https://linear.app/zzanghyunmoo/issue/ZZA-52/notion-작업-문서와-패턴-뱅크-설계) | Consumes Run Passport v0 and later Langfuse evidence. | Design plan is done; API/worker split and retry/DLQ are now available, so automation hooks should next focus on idempotency, persistence, and redaction safety. |
 | [ZZA-55](https://linear.app/zzanghyunmoo/issue/ZZA-55/github-pr-리뷰-패킷-설계) | Consumes ZZA-52 links and Run Passport v0. | Design plan is done; optionally enrich after ZZA-60. |
-| [ZZA-53](https://linear.app/zzanghyunmoo/issue/ZZA-53/linear-이슈-실행-지시서-설계) | Top-level execution workflow. | Start after ZZA-59, ZZA-61, ZZA-64, ZZA-52, and ZZA-55. |
-| [ZZA-54](https://linear.app/zzanghyunmoo/issue/ZZA-54/provider-doctor와-로컬-안전문-설계) | Mostly covered by ZZA-51 and U6 hardening. | Recheck after ZZA-64; close if duplicate or redefine remaining scope. |
+| [ZZA-53](https://linear.app/zzanghyunmoo/issue/ZZA-53/linear-이슈-실행-지시서-설계) | Top-level execution workflow. | Start next after the merged infrastructure foundation and ZZA-52/ZZA-55 design contracts. |
+| [ZZA-54](https://linear.app/zzanghyunmoo/issue/ZZA-54/provider-doctor와-로컬-안전문-설계) | Mostly covered by ZZA-51 and U6 hardening. | Close as duplicate or redefine only the provider-doctor leftovers not covered by readiness and agent hardening. |
 
 ### Assumptions
 
@@ -216,11 +229,11 @@ flowchart LR
 
 ### Risks and Mitigations
 
-- **Risk:** Langfuse traces may capture sensitive repo or ticket content. **Mitigation:** redact first, store only allowlisted metadata by default, and require explicit opt-in for raw prompt/output capture.
+- **Risk:** Langfuse traces may capture sensitive repo or ticket content. **Mitigation:** redact first, store only allowlisted metadata by default, and apply the raw-capture controls defined in U4 before any prompt/output capture.
 - **Risk:** Kafka retry can duplicate work if ticket state is not idempotent. **Mitigation:** gate worker execution on current ticket status and write tests for duplicate message handling.
 - **Risk:** LiteLLM may not be compatible with Claude Code CLI routing. **Mitigation:** keep it as a spike with an adoption gate, not a production dependency.
 - **Risk:** OTel and Langfuse overlap can create confusing double instrumentation. **Mitigation:** keep OTel for service/runtime telemetry and Langfuse for AI-run traces.
-- **Risk:** Docker socket hardening can break local development. **Mitigation:** keep the local profile explicit and add production-like warnings before restricting the default developer path.
+- **Risk:** Docker socket hardening can break local development. **Mitigation:** keep the local posture explicit while requiring production-like environments to fail readiness or block startup unless Docker socket execution is explicitly allowed.
 
 ---
 
@@ -238,7 +251,7 @@ flowchart LR
 - **Test scenarios:**
   - API host composition registers endpoints and health checks but does not register `KafkaAgentWorker` when running in API mode.
   - Worker host composition registers `KafkaAgentWorker`, `AgentJob`, queue options, and infrastructure services without mapping HTTP endpoints.
-  - Compose default or documented core profile starts `api`, `worker`, `postgres`, and `kafka` with the worker connected to the same network and environment surface.
+  - The default Compose invocation starts `api`, `worker`, `postgres`, and `kafka` with the worker connected to the same network and environment surface.
   - Misconfigured role value fails fast or falls back to a documented safe default without silently running both roles.
 - **Verification:** `dotnet build` and `dotnet test` pass; local Compose can start API and worker separately and `/health` still verifies DB, Kafka, and Docker from the API service.
 
@@ -280,21 +293,23 @@ flowchart LR
 - **Requirements:** R7, R8, R9, AE4.
 - **Dependencies:** U2, U3.
 - **Files:** `src/DevAutomation.Core/Options/LangfuseOptions.cs`, `src/DevAutomation.Infrastructure/Telemetry/IAgentTraceSink.cs`, `src/DevAutomation.Infrastructure/Telemetry/LangfuseAgentTraceSink.cs`, `src/DevAutomation.Infrastructure/Telemetry/NoOpAgentTraceSink.cs`, `src/DevAutomation.Infrastructure/Agents/AgentJob.cs`, `src/DevAutomation.Infrastructure/Agents/DockerAgentRunner.cs`, `src/DevAutomation.Infrastructure/Agents/ClaudeStreamParser.cs`, `src/DevAutomation.Infrastructure/Readiness/SecretCatalog.cs`, `src/DevAutomation.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`, `src/DevAutomation.Api/appsettings.json`, `.env.example`, `tests/DevAutomation.Tests/LangfuseAgentTraceSinkTests.cs`, `tests/DevAutomation.Tests/SecretRedactorTests.cs`, `docs/features/persistence-observability.md`, `docs/qa/06-persistence-observability.md`.
-- **Approach:** Add an optional trace sink abstraction that receives sanitized agent lifecycle events from `AgentJob` and parsed stream-json events from `DockerAgentRunner`. The Langfuse implementation should build one trace per ticket/run with spans or events for queue start, container start, approval waits, agent output summary, completion/failure, and PR/MR URL. Raw prompt/output capture should be opt-in and redacted before submission.
+- **Approach:** Add an optional trace sink abstraction that receives sanitized agent lifecycle events from `AgentJob` and parsed stream-json events from `DockerAgentRunner`. The Langfuse implementation should build one trace per immutable `execution_id`, correlated with `ticket_id`, with spans or events for queue start, container start, approval waits, agent output summary, completion/failure, and PR/MR URL. Apply the retry, duplicate, and replay semantics in the minimal trace identity contract above without adding Run Passport persistence.
+- **Raw-capture governance:** Metadata-only allowlisting is the default. Raw prompt/output capture requires a separate explicit deployment-owner opt-in and a documented business need. Shared or production-like environments must use a trusted HTTPS endpoint with certificate validation; plaintext or self-signed endpoints are local-only. Credentials come from the deployment secret store/environment, are scoped to one environment/project with write-only access where supported, never enter agent containers or logs, and are rotated on exposure. Use a separate Langfuse project and credential set for each environment/trust boundary. Before enablement, document a finite retention period, provider-side deletion procedure keyed by `execution_id`/`ticket_id`, and an owner who can disable capture; verify deletion in the target project. If any control is absent, raw capture remains disabled.
 - **Patterns to follow:** Existing `DevAutomationTelemetry` counters, `ClaudeStreamParser`, `SecretCatalog`, and `SecretRedactor` registration.
 - **Test scenarios:**
   - Langfuse disabled uses `NoOpAgentTraceSink` and does not create HTTP clients or outbound calls during an agent run.
   - Langfuse enabled sends ticket id, status, duration, provider, and PR/MR URL metadata for a completed run.
   - Failed run sends failure reason after redaction and records terminal outcome.
   - Prompt/output payload containing configured Anthropic, GitHub, Linear, Notion, or database secrets is redacted before the sink serializes the payload.
+  - Raw capture cannot be enabled without explicit authority, a trusted endpoint policy, scoped credentials, environment/project isolation, and documented retention/deletion controls.
   - Langfuse API failure is surfaced as telemetry/log warning and does not change ticket terminal status.
-- **Verification:** Unit tests prove redaction and disabled-mode behavior; a configured Langfuse endpoint shows one trace per smoke ticket with no raw secret values.
+- **Verification:** Unit tests prove redaction and disabled-mode behavior; a configured Langfuse endpoint shows one trace per smoke execution, correlated to its ticket, with no raw secret values.
 
 ### U5. Run LiteLLM proxy compatibility spike
 
 - **Goal:** Decide whether LiteLLM should become the LLM gateway for ReplaceMe agent runs.
 - **Requirements:** R10, R11, AE5.
-- **Dependencies:** U4.
+- **Dependencies:** Stable run identity and the shared redaction baseline. Full U4 output is required only when the spike names a Langfuse-dependent experiment and explains why proxy evidence alone is insufficient.
 - **Files:** `docs/spikes/litellm-claude-code-proxy.md`, `docker/litellm/config.yaml`, `docker-compose.yml`, `src/DevAutomation.Core/Options/CodingAgentOptions.cs`, `src/DevAutomation.Infrastructure/CodingAgents/ClaudeCodeCodingAgentIntegration.cs`, `.env.example`, `docs/features/agent-execution.md`, `docs/qa/03-agent-execution.md`.
 - **Approach:** Add an optional `llm-gateway` profile and spike doc that tests whether Claude Code can route through a LiteLLM-compatible endpoint while preserving approval MCP behavior and stream-json parsing. Record whether virtual keys, rate limits, cost tracking, and Langfuse/OTel correlation are available in the intended execution path. Do not make LiteLLM required for normal runs until the spike produces an adopt decision.
 - **Execution note:** Treat this as a spike with a written decision record; implementation should prefer smoke evidence over broad code changes.
@@ -313,7 +328,7 @@ flowchart LR
 - **Requirements:** R12, R13, AE6.
 - **Dependencies:** U1, U2.
 - **Files:** `src/DevAutomation.Core/Options/AgentOptions.cs`, `src/DevAutomation.Infrastructure/Agents/DockerAgentRunner.cs`, `src/DevAutomation.Infrastructure/Readiness/Checks/DockerReadinessCheck.cs`, `src/DevAutomation.Infrastructure/Readiness/SecretCatalog.cs`, `src/DevAutomation.Infrastructure/Agents/SecretRedactor.cs`, `.env.example`, `docker-compose.yml`, `tests/DevAutomation.Tests/ProfileReadinessTests.cs`, `tests/DevAutomation.Tests/SecretRedactorTests.cs`, `docs/features/agent-execution.md`, `docs/features/readiness-profile.md`, `docs/qa/01-readiness-profile.md`.
-- **Approach:** Add explicit options for local Docker-socket execution posture, agent network policy expectations, and allowed secret propagation. Readiness should warn or block when a production-like environment uses local-only Docker socket mode without opt-in. Expand secret catalog coverage for new Langfuse and LiteLLM keys and ensure every new sink uses the shared redactor.
+- **Approach:** Add explicit options for local Docker-socket execution posture, agent network policy expectations, and allowed secret propagation. Readiness must report a required failure or startup must block when a production-like environment uses local-only Docker socket mode without opt-in; a warning is acceptable only in local development. Expand secret catalog coverage for new Langfuse and LiteLLM keys and ensure every new sink uses the shared redactor.
 - **Patterns to follow:** Existing readiness check model, `SecretRedactionReadinessCheck`, and `DockerAgentRunner` environment construction.
 - **Test scenarios:**
   - Local development mode allows Docker socket execution with a documented warning level.
@@ -336,7 +351,7 @@ flowchart LR
 | Observability profile smoke | U3 | Collector/backend profile starts and receives API/worker telemetry. |
 | Langfuse smoke | U4 | Configured Langfuse target shows one redacted trace per test ticket. |
 | LiteLLM spike smoke | U5 | Spike doc records proxy compatibility evidence and verdict. |
-| Readiness hardening smoke | U6 | Production-like unsafe Docker socket posture is reported or blocked as designed. |
+| Readiness hardening smoke | U6 | Production-like unsafe Docker socket posture produces a required readiness failure or startup block. |
 
 ---
 

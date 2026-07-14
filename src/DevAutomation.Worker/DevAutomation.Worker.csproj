@@ -17,6 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\DevAutomation.Shared\ServiceCollectionTelemetryExtensions.cs" Link="ServiceCollectionTelemetryExtensions.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\DevAutomation.Core\DevAutomation.Core.csproj" />
     <ProjectReference Include="..\DevAutomation.Infrastructure\DevAutomation.Infrastructure.csproj" />
   </ItemGroup>

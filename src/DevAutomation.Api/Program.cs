@@ -15,7 +15,6 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
 
@@ -36,45 +35,10 @@ builder.Services.AddDevAutomationCore(builder.Configuration);
 builder.Services.AddDevAutomationInfrastructure(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 
-var telemetryOptions = builder.Configuration.GetSection(TelemetryOptions.SectionName).Get<TelemetryOptions>() ?? new TelemetryOptions();
-if (telemetryOptions.Enabled)
-{
-    builder.Services.AddOpenTelemetry()
-        .ConfigureResource(resource => resource.AddService(telemetryOptions.ServiceName))
-        .WithTracing(tracing =>
-        {
-            tracing
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddSource(DevAutomationTelemetry.ActivitySourceName);
-
-            if (!string.IsNullOrWhiteSpace(telemetryOptions.OtlpEndpoint))
-            {
-                tracing.AddOtlpExporter(options =>
-                {
-                    options.Endpoint = new Uri(telemetryOptions.OtlpEndpoint);
-                    if (!string.IsNullOrWhiteSpace(telemetryOptions.OtlpHeaders)) options.Headers = telemetryOptions.OtlpHeaders;
-                });
-            }
-        })
-        .WithMetrics(metrics =>
-        {
-            metrics
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddRuntimeInstrumentation()
-                .AddMeter(DevAutomationTelemetry.MeterName);
-
-            if (!string.IsNullOrWhiteSpace(telemetryOptions.OtlpEndpoint))
-            {
-                metrics.AddOtlpExporter(options =>
-                {
-                    options.Endpoint = new Uri(telemetryOptions.OtlpEndpoint);
-                    if (!string.IsNullOrWhiteSpace(telemetryOptions.OtlpHeaders)) options.Headers = telemetryOptions.OtlpHeaders;
-                });
-            }
-        });
-}
+builder.Services.AddDevAutomationOpenTelemetry(
+    builder.Configuration,
+    tracing => tracing.AddAspNetCoreInstrumentation(),
+    metrics => metrics.AddAspNetCoreInstrumentation());
 
 var app = builder.Build();
 

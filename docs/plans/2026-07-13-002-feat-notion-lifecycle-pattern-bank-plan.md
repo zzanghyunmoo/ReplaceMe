@@ -20,7 +20,7 @@ execution: design
 | Objective | Define the v1 Notion lifecycle document and pattern bank contract for ReplaceMe so Linear, GitHub, Run Passport, and later Langfuse evidence use one stable backlink and promotion model. |
 | Product authority | Linear ZZA-52: Notion 작업 문서와 패턴 뱅크 설계. |
 | Execution profile | Design/documentation contract only for this slice; no external Notion, Linear, or GitHub changes. |
-| Stop conditions | Stop before implementing automation hooks that require retry/DLQ, Langfuse integration, or full Run Passport persistence. The API/worker split dependency is now satisfied by ZZA-59. |
+| Stop conditions | Stop before implementing automation hooks that require Langfuse integration, full Run Passport persistence, or unproven idempotent Notion writes. The API/worker split and retry/DLQ dependencies are now satisfied by ZZA-59/ZZA-61. |
 | Tail ownership | Later implementation tickets should use this plan as the contract and keep provider automation behind readiness and runtime gates. |
 
 ---
@@ -35,7 +35,7 @@ ReplaceMe needs a Notion surface that is useful during and after each automated 
 
 Run Passport v0 already reserves `notionDocumentId` and `notionDocumentUrl` and defines shared run identity fields in [`../features/run-passport.md`](../features/run-passport.md). The current document tool can create a simple ticket document, but it does not define lifecycle sections, idempotent update semantics, backlinks, or reusable pattern promotion rules. If Notion pages, PR packets, and Linear comments each invent separate naming and linking conventions, ZZA-55 and ZZA-53 will need avoidable normalization work.
 
-The infrastructure roadmap in [`2026-07-13-001-feat-infra-foundation-roadmap-plan.md`](./2026-07-13-001-feat-infra-foundation-roadmap-plan.md) is dependency context only. ZZA-59 has since delivered the API/worker split; this plan still does not duplicate Kafka retry/DLQ, OpenTelemetry Collector, or Langfuse implementation details, and only states which Notion evidence slots those later capabilities may fill.
+The infrastructure roadmap in [`2026-07-13-001-feat-infra-foundation-roadmap-plan.md`](./2026-07-13-001-feat-infra-foundation-roadmap-plan.md) is dependency context only. ZZA-59 and ZZA-61 have since delivered the API/worker split and retry/DLQ baseline; this plan still does not duplicate OpenTelemetry Collector or Langfuse implementation details, and only states which Notion evidence slots those later capabilities may fill.
 
 ### Actors
 
@@ -65,7 +65,7 @@ The infrastructure roadmap in [`2026-07-13-001-feat-infra-foundation-roadmap-pla
 **Automation and linking**
 
 - R10. Lifecycle page auto-create/update must be idempotent and keyed by `runPassportId` plus provider/page id once persistence exists.
-- R11. Although the API/worker split from the infra roadmap is now available, lifecycle page creation should remain explicit/manual or endpoint-driven until retry/DLQ and idempotency are in place; no background worker hook is required by this plan.
+- R11. Although the API/worker split and retry/DLQ baseline from the infra roadmap are now available, lifecycle page creation should remain explicit/manual or endpoint-driven until idempotency, persistence, and redaction safety are in place; no background worker hook is required by this plan.
 - R12. Linear, GitHub, and Notion backlink updates must use idempotent markers or stable sections so reruns update the existing reference instead of appending duplicates.
 - R13. Run Passport remains the common read contract. Notion links should enrich Run Passport when persistence exists, but Run Passport v0 must remain usable with null Notion fields.
 
@@ -199,8 +199,8 @@ This index is a navigation aid only. It must not replace the pattern entry prove
 
 | Decision | Default v1 behavior | Auto allowed when | Manual required when | Rationale |
 | --- | --- | --- | --- | --- |
-| Create lifecycle page | Manual or explicit API action by default; worker-triggered later after retry/DLQ and idempotency gates | Readiness passes, document provider is `Notion`, a ticket exists, `runPassportId` is known, and idempotency lookup finds no existing page | Provider disabled, credentials missing, operator wants no external doc, or run is exploratory/private | Lifecycle docs are operational evidence, but external writes must stay gated. |
-| Update lifecycle page | Explicit endpoint/update operation by default; worker lifecycle hook later after retry/DLQ and idempotency gates | Existing page id is known and update targets generated sections only | Conflict with human-edited generated section, missing idempotency key, or redaction uncertainty | Prevent duplicate pages and protect human notes. |
+| Create lifecycle page | Manual or explicit API action by default; worker-triggered later after idempotency/persistence gates | Readiness passes, document provider is `Notion`, a ticket exists, `runPassportId` is known, and idempotency lookup finds no existing page | Provider disabled, credentials missing, operator wants no external doc, or run is exploratory/private | Lifecycle docs are operational evidence, but external writes must stay gated. |
+| Update lifecycle page | Explicit endpoint/update operation by default; worker lifecycle hook later after idempotency/persistence gates | Existing page id is known and update targets generated sections only | Conflict with human-edited generated section, missing idempotency key, or redaction uncertainty | Prevent duplicate pages and protect human notes. |
 | Add Linear backlink | Later idempotent comment or marked description section | Linear issue URL/key exists and the Notion page URL is available | Linear issue missing, API permission missing, or user chooses local-only mode | Linear should point to evidence but not be the page source of truth. |
 | Add GitHub PR backlink | Later PR body marked section or comment | PR URL exists and Notion page URL plus Run Passport URL are available | PR not created, PR body owned by another workflow, or provider permission missing | PR reviewers need links without duplicate comments. |
 | Suggest pattern candidate | Allowed as generated notes in lifecycle page | A run yields a reusable lesson with evidence and no sensitive content | Candidate contains secrets, raw prompts, one-off project specifics, or no validation | Suggestions are low-risk if clearly non-canonical. |
@@ -351,11 +351,11 @@ Rules:
 
 **Verification:** Unit tests against serialized Notion payload; no real Notion API call in unit tests.
 
-### U4. Add idempotent backlink publishing after retry/DLQ gates are available
+### U4. Add idempotent backlink publishing after write-safety gates are available
 
 **Goal:** Publish lifecycle-page backlinks to Linear and GitHub without duplicate comments or unsafe background coupling.
 
-**Dependencies:** U2 and U3. The API/worker split from [`2026-07-13-001-feat-infra-foundation-roadmap-plan.md`](./2026-07-13-001-feat-infra-foundation-roadmap-plan.md) U1 is satisfied by ZZA-59; retry/DLQ from that roadmap is still recommended before automatic background publishing.
+**Dependencies:** U2 and U3. The API/worker split and retry/DLQ baseline from [`2026-07-13-001-feat-infra-foundation-roadmap-plan.md`](./2026-07-13-001-feat-infra-foundation-roadmap-plan.md) are satisfied by ZZA-59/ZZA-61; automatic background publishing should now wait on idempotency, persistence, and redaction confidence.
 
 **Files:**
 
@@ -430,7 +430,7 @@ Rules:
 1. ZZA-52 design contract lands first as this plan.
 2. U1 feature documentation can land before code to make the contract discoverable.
 3. U2 and U3 can proceed with explicit/manual document creation because they do not require background worker hooks.
-4. U4 no longer waits on the API/worker split, but should still wait for retry/DLQ work from the infra roadmap before automatic background publishing.
+4. U4 no longer waits on the API/worker split or retry/DLQ baseline; it should wait for idempotency, persistence, and redaction confidence before automatic background publishing.
 5. U5 can proceed after the lifecycle template exists, but pattern `Accepted` promotion always remains manual.
 6. U6 waits for Langfuse tracing and must remain non-blocking.
 
@@ -481,6 +481,6 @@ For later implementation units:
 - **Risk:** Pattern bank fills with unreviewed agent guesses. **Mitigation:** only curator-approved entries can become `Accepted`; suggestions stay non-canonical.
 - **Risk:** External backlinks duplicate on retries. **Mitigation:** use stable markers and idempotent update semantics.
 - **Risk:** Langfuse or logs leak sensitive content into Notion. **Mitigation:** allowlisted aggregate evidence only and shared redaction before serialization.
-- **Risk:** Background hooks can duplicate or lose external writes if retries are not bounded. **Mitigation:** target the separate worker boundary delivered by ZZA-59 and keep automatic hooks gated behind retry/DLQ plus idempotent markers.
+- **Risk:** Background hooks can duplicate or lose external writes if idempotency is weak. **Mitigation:** target the separate worker boundary delivered by ZZA-59, use the retry/DLQ baseline from ZZA-61, and keep automatic hooks gated behind stable markers plus persisted document references.
 
 <!-- markdownlint-enable MD013 MD025 MD036 -->

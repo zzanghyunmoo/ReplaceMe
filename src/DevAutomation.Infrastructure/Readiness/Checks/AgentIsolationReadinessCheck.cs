@@ -7,6 +7,8 @@ namespace DevAutomation.Infrastructure.Readiness.Checks;
 
 public sealed class AgentIsolationReadinessCheck : IProfileReadinessCheck
 {
+    public const string CheckId = "agent.docker.socket.posture";
+
     private readonly AgentOptions _agentOptions;
     private readonly IConfiguration _configuration;
 
@@ -16,7 +18,7 @@ public sealed class AgentIsolationReadinessCheck : IProfileReadinessCheck
         _configuration = configuration;
     }
 
-    public string Id => "agent.docker.socket.posture";
+    public string Id => CheckId;
 
     public Task<ProfileReadinessCheckResult> CheckAsync(ProfileReadinessContext context, CancellationToken cancellationToken)
     {
@@ -34,7 +36,7 @@ public sealed class AgentIsolationReadinessCheck : IProfileReadinessCheck
         if (options.DockerSocketMode == AgentDockerSocketMode.Disabled)
         {
             return ProfileReadinessCheckResult.Failed(
-                "agent.docker.socket.posture",
+                CheckId,
                 "Agent isolation",
                 ProfileReadinessSeverity.Required,
                 "Agent Docker socket execution is disabled, but no alternate runner is configured.",
@@ -45,7 +47,7 @@ public sealed class AgentIsolationReadinessCheck : IProfileReadinessCheck
         if (!options.AllowLocalDockerSocket)
         {
             return ProfileReadinessCheckResult.Failed(
-                "agent.docker.socket.posture",
+                CheckId,
                 "Agent isolation",
                 ProfileReadinessSeverity.Required,
                 productionLike
@@ -57,7 +59,7 @@ public sealed class AgentIsolationReadinessCheck : IProfileReadinessCheck
         if (productionLike && !options.AllowLocalDockerSocketInProductionLike)
         {
             return ProfileReadinessCheckResult.Failed(
-                "agent.docker.socket.posture",
+                CheckId,
                 "Agent isolation",
                 ProfileReadinessSeverity.Required,
                 "Production-like agent execution is configured with the local host Docker socket, but production-like opt-in is false.",
@@ -65,7 +67,7 @@ public sealed class AgentIsolationReadinessCheck : IProfileReadinessCheck
         }
 
         return ProfileReadinessCheckResult.Warning(
-            "agent.docker.socket.posture",
+            CheckId,
             "Agent isolation",
             productionLike
                 ? "Production-like agent execution is explicitly opted into the local host Docker socket. Treat this as a temporary exception."
