@@ -82,6 +82,37 @@ public sealed class HostingCompositionTests
         Assert.Contains("condition: service_completed_successfully", apiService);
     }
 
+    [Fact]
+    public void ComposePublishesLocalServicesOnLoopbackOnly()
+    {
+        var compose = ReadRepoFile("docker-compose.yml");
+
+        Assert.Contains("127.0.0.1:8080:8080", compose);
+        Assert.Contains("127.0.0.1:5432:5432", compose);
+        Assert.Contains("127.0.0.1:9092:9094", compose);
+        Assert.Contains("127.0.0.1:4317:4317", compose);
+        Assert.Contains("127.0.0.1:4318:4318", compose);
+        Assert.Contains("127.0.0.1:8889:8889", compose);
+        Assert.Contains("127.0.0.1:16686:16686", compose);
+        Assert.Contains("127.0.0.1:9090:9090", compose);
+        Assert.DoesNotContain("- \"8080:8080\"", compose);
+        Assert.DoesNotContain("- \"5432:5432\"", compose);
+        Assert.DoesNotContain("- \"9092:9094\"", compose);
+    }
+
+    [Fact]
+    public void ComposeAllowsQueueAndIsolationOverridesFromEnvironment()
+    {
+        var compose = ReadRepoFile("docker-compose.yml");
+        var apiService = SliceBetween(compose, "  api:", "\n  migrate:");
+        var workerService = SliceBetween(compose, "  worker:", "\n  postgres:");
+
+        Assert.Contains("${DEVAUTOMATION_Queue__KafkaDlqTopic:-devautomation.agent-jobs.dlq}", apiService);
+        Assert.Contains("${DEVAUTOMATION_Queue__MaxAttempts:-3}", workerService);
+        Assert.Contains("${DEVAUTOMATION_Agent__ExecutionIsolationProfile:-LocalDevelopment}", apiService);
+        Assert.Contains("${DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike:-false}", workerService);
+    }
+
     private static IConfiguration CreateConfiguration()
     {
         return new ConfigurationBuilder()
