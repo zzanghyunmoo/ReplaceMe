@@ -105,7 +105,11 @@ public sealed class RunPassportContractTests
     [InlineData("https://linear.app/example/issue/ZZA-56?token=secret")]
     [InlineData("https://linear.app/example/issue/ZZA-56?client_secret=secret")]
     [InlineData("https://linear.app/example/issue/ZZA-56?X-Amz-Signature=secret")]
-    [InlineData("https://linear.app/example/issue/ZZA-56?%ZZ=value")]
+    [InlineData("https://linear.app/example/issue/ZZA-56?foo=token%3Dsecret")]
+    [InlineData("https://linear.app/example/issue/ZZA-56?metadata=%7B%22token%22%3A%22secret%22%7D")]
+    [InlineData("https://linear.app/example/issue/ZZA-56#access_token=secret")]
+    [InlineData("https://linear.app/example/issue/ZZA-56?foo=%ZZ")]
+    [InlineData("https://linear.app/example/issue/ZZA-56#view=%ZZ")]
     [InlineData("https://evil.example/example/issue/ZZA-56")]
     public void Unsafe_issue_links_map_to_null(string externalIssueUrl)
     {
@@ -115,6 +119,18 @@ public sealed class RunPassportContractTests
         var passport = RunPassportSummaryResponse.From(ticket);
 
         Assert.Null(passport.ExternalIssueUrl);
+    }
+
+    [Fact]
+    public void Benign_issue_query_value_and_fragment_are_preserved()
+    {
+        var url = "https://linear.app/example/issue/ZZA-56?label=security-review#discussion";
+        var ticket = Ticket.Create("Build feature", "Do the work", "https://github.com/example/repo.git", null, DateTimeOffset.UtcNow);
+        ticket.AttachIssueTracker(IssueTrackerProvider.Linear, "issue-id", "ZZA-56", url);
+
+        var passport = RunPassportSummaryResponse.From(ticket);
+
+        Assert.Equal(url, passport.ExternalIssueUrl);
     }
 
     [Fact]
@@ -144,6 +160,11 @@ public sealed class RunPassportContractTests
     [InlineData("http://github.com/example/repo/pull/56")]
     [InlineData("https://user:password@github.com/example/repo/pull/56")]
     [InlineData("https://github.com/example/repo/pull/56?access_token=secret")]
+    [InlineData("https://github.com/example/repo/pull/56?foo=token%3Dsecret")]
+    [InlineData("https://github.com/example/repo/pull/56?metadata=%7B%22token%22%3A%22secret%22%7D")]
+    [InlineData("https://github.com/example/repo/pull/56#access_token=secret")]
+    [InlineData("https://github.com/example/repo/pull/56?foo=%ZZ")]
+    [InlineData("https://github.com/example/repo/pull/56#view=%ZZ")]
     [InlineData("https://gitlab.com/example/repo/-/merge_requests/56")]
     public void Missing_or_unsafe_pull_request_links_map_to_null(string? pullRequestUrl)
     {
@@ -154,6 +175,19 @@ public sealed class RunPassportContractTests
 
         Assert.Null(passport.PullRequestUrl);
         Assert.Equal("Ticket completed without a pull request.", passport.Summary);
+    }
+
+    [Fact]
+    public void Benign_pull_request_query_value_and_fragment_are_preserved()
+    {
+        var url = "https://github.com/example/repo/pull/56?view=files#discussion_r1";
+        var ticket = CreateRunningTicket();
+        ticket.MarkCompleted(DateTimeOffset.UtcNow, url);
+
+        var passport = RunPassportSummaryResponse.From(ticket);
+
+        Assert.Equal(url, passport.PullRequestUrl);
+        Assert.Equal("Ticket completed with a pull request.", passport.Summary);
     }
 
     [Fact]
@@ -201,17 +235,7 @@ public sealed class RunPassportContractTests
             passport,
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
-        Assert.Equal("run-passport-summary/v1", root.GetProperty("contractVersion").GetString());
-        Assert.Equal("Pending", root.GetProperty("status").GetString());
-        Assert.Equal("Linear", root.GetProperty("issueTracker").GetString());
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("pullRequestUrl").ValueKind);
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("notionDocumentId").ValueKind);
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("notionDocumentUrl").ValueKind);
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("testSummary").ValueKind);
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("residualRiskSummary").ValueKind);
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("failureReason").ValueKind);
-        Assert.Equal(ticket.CreatedAt, root.GetProperty("lastLifecycleAt").GetDateTimeOffset());
-        Assert.False(root.TryGetProperty("updatedAt", out _));
+        RunPassportV1JsonAssert.IsPendingLinearPassport(root, ticket.Id, ticket.CreatedAt);
     }
 
     private static Ticket CreateRunningTicket()

@@ -173,7 +173,8 @@ public sealed record RunPassportSummaryResponse(
             || string.IsNullOrWhiteSpace(uri.Host)
             || !string.IsNullOrEmpty(uri.UserInfo)
             || !isHostAllowed(uri.IdnHost)
-            || HasCredentialQuery(uri.Query))
+            || HasUnsafeUrlComponent(uri.Query, '?')
+            || HasUnsafeUrlComponent(uri.Fragment, '#'))
         {
             return null;
         }
@@ -181,47 +182,84 @@ public sealed record RunPassportSummaryResponse(
         return candidate;
     }
 
-    private static bool HasCredentialQuery(string query)
+    private static bool HasUnsafeUrlComponent(string component, char prefix)
     {
-        if (string.IsNullOrEmpty(query))
+        if (string.IsNullOrEmpty(component))
         {
             return false;
         }
 
-        foreach (var pair in query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        var decoded = component[0] == prefix ? component[1..] : component;
+        const int maximumDecodePasses = 16;
+
+        for (var pass = 0; pass < maximumDecodePasses; pass++)
         {
-            var separator = pair.IndexOf('=');
-            var encodedName = separator < 0 ? pair : pair[..separator];
-            if (HasInvalidPercentEncoding(encodedName))
+            if (HasInvalidPercentEncoding(decoded) || HasCredentialAssignment(decoded))
             {
                 return true;
             }
 
-            string name;
+            string next;
             try
             {
-                name = Uri.UnescapeDataString(encodedName)
-                    .Replace("-", string.Empty, StringComparison.Ordinal)
-                    .Replace("_", string.Empty, StringComparison.Ordinal);
+                next = Uri.UnescapeDataString(decoded);
             }
             catch (UriFormatException)
             {
                 return true;
             }
 
-            if (HasInvalidPercentEncoding(name))
+            if (string.Equals(next, decoded, StringComparison.Ordinal))
             {
-                return true;
+                return false;
             }
 
-            if (CredentialQueryNames.Contains(name)
-                || CredentialQueryMarkers.Any(marker => name.Contains(marker, StringComparison.OrdinalIgnoreCase)))
+            decoded = next;
+        }
+
+        // Excessively nested encoding is outside the public URL contract and fails closed.
+        return true;
+    }
+
+    private static bool HasCredentialAssignment(string value)
+    {
+        for (var separator = 0; separator < value.Length; separator++)
+        {
+            if (value[separator] is not ('=' or ':'))
+            {
+                continue;
+            }
+
+            var end = separator - 1;
+            while (end >= 0 && (char.IsWhiteSpace(value[end]) || value[end] is '"' or '\''))
+            {
+                end--;
+            }
+
+            var start = end;
+            while (start >= 0
+                   && (char.IsLetterOrDigit(value[start]) || value[start] is '-' or '_'))
+            {
+                start--;
+            }
+
+            if (end >= start + 1 && IsCredentialName(value[(start + 1)..(end + 1)]))
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static bool IsCredentialName(string name)
+    {
+        var normalizedName = name
+            .Replace("-", string.Empty, StringComparison.Ordinal)
+            .Replace("_", string.Empty, StringComparison.Ordinal);
+
+        return CredentialQueryNames.Contains(normalizedName)
+            || CredentialQueryMarkers.Any(marker => normalizedName.Contains(marker, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool HasInvalidPercentEncoding(string value)
