@@ -16,9 +16,10 @@ GET /api/tickets/{id}/run-passport
 이 endpoint는 읽기 전용입니다. 기존 Ticket이면 `200 OK`, 없으면 `404 Not Found`를
 반환하며 Ticket 상태, execution log, Kafka queue를 변경하지 않습니다.
 
-> API에는 인증/인가가 없습니다. Compose는 host port를 loopback에 bind하지만, 이
-> endpoint를 public proxy/tunnel로 노출하지 않습니다. Trusted single-user local
-> 환경에서만 사용합니다.
+> API에는 인증/인가가 없습니다. Compose host port의 loopback 강제는 stacked
+> dependency인 PR #22가 소유하며 이 PR에는 해당 파일을 중복하지 않습니다. PR #22가
+> 함께 적용되지 않은 배포에서는 이 endpoint를 public proxy/tunnel로 노출하지 않고
+> trusted single-user local 환경에서만 사용합니다.
 
 ## 한눈에 보기
 
@@ -87,8 +88,8 @@ Issue/PR URL은 다음 조건을 모두 만족할 때만 반환합니다.
 
 1. Absolute HTTPS URL입니다.
 2. URL userinfo가 없습니다.
-3. `token`, `secret`, `password`, `credential`, `signature`, API/access key 계열 query가
-   없습니다.
+3. Query와 fragment를 percent-decode했을 때 `token`, `secret`, `password`,
+   `credential`, `signature`, API/access key 계열의 credential assignment가 없습니다.
 4. Provider별 허용 host와 일치합니다.
 
 Host 규칙:
@@ -98,8 +99,19 @@ Host 규칙:
 - PR/MR: Ticket `repoUrl`의 host
 
 빈 문자열, whitespace, HTTP, credential 포함 URL, 예상하지 않은 host는 `null`로
-정규화됩니다. `repoUrl`과 `baseBranch` 자체는 Run Passport 응답 필드가 아니므로
-필요한 downstream consumer는 별도 Ticket API에서 읽습니다.
+정규화됩니다. Query/fragment의 malformed percent encoding, decoded nested assignment
+(`foo=token%3Dsecret`), JSON credential field, fragment assignment도 fail closed로
+`null`이 됩니다. 정상적인 path와 credential assignment가 없는 query/fragment 값은
+원문 그대로 유지합니다.
+
+이 검증의 normative boundary는 URL authority와 query/fragment의 credential-key
+assignment syntax입니다. Query/fragment는 안정될 때까지 최대 16회 percent-decode하며,
+그 전에 malformed encoding이 나타나거나 제한 안에 안정되지 않으면 거부합니다. Path를
+secret scanner처럼 해석하거나 URL 모든 위치의 임의 문자열이 secret이 아니라고
+보증하지는 않습니다. 또한 PR/MR은 이 slice에서 `repoUrl`과 host만 비교합니다. 동일
+host 안의 repository identity/index 검증은 stacked dependency인 PR #23이 소유하며 이
+PR에는 해당 파일을 중복하지 않습니다. `repoUrl`과 `baseBranch` 자체는 Run Passport
+응답 필드가 아니므로 필요한 downstream consumer는 별도 Ticket API에서 읽습니다.
 
 ## Nullable field availability
 
@@ -160,3 +172,5 @@ Jira configured host, Ticket/log/Kafka non-mutation을 검증합니다.
   자동 구현은 아직 없습니다.
 - `runPassportUrl`을 external absolute URL로 바꾸는 canonical public base URL 계약이
   없습니다.
+- Compose loopback 강제는 stacked PR #22, repository identity/index 검증은 stacked
+  PR #23에서 해결되며 이 PR은 해당 변경 파일을 중복하지 않습니다.

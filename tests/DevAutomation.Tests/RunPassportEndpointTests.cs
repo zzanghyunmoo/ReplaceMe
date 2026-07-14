@@ -26,18 +26,7 @@ public sealed class RunPassportEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var root = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("run-passport-summary/v1", root.GetProperty("contractVersion").GetString());
-        Assert.Equal($"ticket:{ticket.Id}", root.GetProperty("runPassportId").GetString());
-        Assert.Equal($"/api/tickets/{ticket.Id}/run-passport", root.GetProperty("runPassportUrl").GetString());
-        Assert.Equal("Pending", root.GetProperty("status").GetString());
-        Assert.Equal(ticket.CreatedAt, root.GetProperty("lastLifecycleAt").GetDateTimeOffset());
-        Assert.False(root.TryGetProperty("updatedAt", out _));
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("pullRequestUrl").ValueKind);
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("notionDocumentId").ValueKind);
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("notionDocumentUrl").ValueKind);
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("testSummary").ValueKind);
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("residualRiskSummary").ValueKind);
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("failureReason").ValueKind);
+        RunPassportV1JsonAssert.IsPendingLinearPassport(root, ticket.Id, ticket.CreatedAt);
 
         var snapshot = await factory.GetSnapshotAsync(ticket.Id);
         Assert.Equal(TicketStatus.Pending, snapshot.Status);
@@ -124,6 +113,11 @@ public sealed class RunPassportEndpointTests
                 "https://github.com/example/repo.git",
                 "main",
                 createdAt);
+            ticket.AttachIssueTracker(
+                IssueTrackerProvider.Linear,
+                "issue-id",
+                "ZZA-56",
+                "https://linear.app/example/issue/ZZA-56");
             configure?.Invoke(ticket);
             dbContext.Tickets.Add(ticket);
             dbContext.ExecutionLogs.Add(new ExecutionLog(ticket.Id, createdAt, "seed", "Existing log"));
