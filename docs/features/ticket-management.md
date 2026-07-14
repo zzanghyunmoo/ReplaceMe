@@ -25,7 +25,7 @@
 | --- | --- | --- |
 | `POST` | `/api/tickets` | 티켓 생성 + readiness gate 통과 시 Kafka agent job enqueue |
 | `GET` | `/api/tickets/{id}` | 단일 티켓 상태 조회 |
-| `GET` | `/api/tickets/{id}/run-passport` | 티켓에서 파생한 Run Passport v0 summary 조회 |
+| `GET` | `/api/tickets/{id}/run-passport` | 티켓에서 파생한 Run Passport v1 summary 조회 |
 | `GET` | `/api/tickets` | 상태 필터와 페이징을 지원하는 목록 조회 |
 | `POST` | `/api/tickets/{id}/cancel` | 티켓 취소 + 연결된 컨테이너 중지 시도 |
 | `GET` | `/api/tickets/{id}/logs` | 티켓별 실행 로그 조회 |
@@ -51,8 +51,10 @@
 
 응답은 `TicketResponse` 형태로 티켓의 현재 상태, PR/MR URL, 실패 사유,
 외부 이슈 tracker reference를 반환합니다. `GET /api/tickets/{id}/run-passport`는
-같은 티켓에서 `RunPassportSummaryResponse`를 파생해 후속 Notion/PR surface가
-공유할 v0 summary contract를 반환합니다.
+같은 티켓에서 `run-passport-summary/v1`을 파생합니다. Passport ID는 mutable
+Ticket workflow key이며 immutable attempt/rerun ID가 아닙니다. 안전하지 않은 issue/PR
+URL은 `null`, raw failure reason은 generic public-safe 문장으로 projection됩니다.
+`repoUrl`과 `baseBranch`가 필요한 consumer는 별도 Ticket 응답을 함께 사용합니다.
 
 `createExternalIssue`가 `true`이거나 기존 이슈 reference를 붙이는 경우
 `IssueTracker:Provider`는 `Jira` 또는 `Linear`여야 합니다.
@@ -65,23 +67,31 @@
 stateDiagram-v2
     [*] --> Pending: ticket created
     Pending --> Running: Kafka worker starts
+    Pending --> Failed: readiness blocked / DLQ exhausted
     Running --> WaitingApproval: approval_prompt called
-    WaitingApproval --> Running: approved / rejected handled
-    Running --> Completed: agent succeeded
-    Running --> Failed: timeout / exit code / exception
+    WaitingApproval --> Running: decision returned
+    Running --> Pending: retryable worker exception
+    WaitingApproval --> Pending: retryable worker exception
+    Running --> Completed: container exit 0
+    WaitingApproval --> Completed: container exit 0
+    Running --> Failed: agent result failed
+    WaitingApproval --> Failed: agent result failed
     Pending --> Cancelled: cancel API
     Running --> Cancelled: cancel API
     WaitingApproval --> Cancelled: cancel API
+    Failed --> Cancelled: current cancel rule
     Completed --> [*]
-    Failed --> [*]
     Cancelled --> [*]
 ```
 
-- `Pending`: 티켓 생성 직후
+- `Pending`: 생성 직후 또는 retry publish 전으로 되돌린 상태
 - `Running`: Kafka worker가 시작되어 agent container가 실행 중
-- `WaitingApproval`: MCP approval tool이 active notifier 승인을 기다리는 중
-- `Completed`: agent container가 성공 종료하고 PR/MR URL을 기록한 상태
-- `Failed`: agent timeout, container exit code, 예외 발생
+- `WaitingApproval`: Approval MCP가 현재 Slack 기본 notifier로 알림을 시도하고
+  DB 결정을 기다리는 상태
+- `Completed`: agent container가 exit code 0으로 종료한 상태. 변경이나 PR/MR URL은
+  없을 수 있습니다.
+- `Failed`: readiness 차단, agent 실패, DLQ 소진 등으로 실패한 상태. Worker replay는
+  no-op으로 보지만 현재 cancel API는 `Failed -> Cancelled`를 허용합니다.
 - `Cancelled`: 사용자가 취소 API를 호출한 상태
 
 ## 코드 위치
@@ -129,6 +139,10 @@ curl http://localhost:8080/api/tickets/{ticket-id}/logs
 ## 현재 한계
 
 - API 인증/인가가 아직 없습니다.
+- Ticket DB save와 Kafka publish가 원자적이지 않습니다. broker publish 실패 시
+  Pending row를 자동 복구하는 outbox/reconciler가 없습니다.
 - 실패한 티켓 재실행 API는 아직 없습니다.
 - `cancel`은 티켓 상태를 먼저 취소로 바꾸고, 이후 Docker container stop을
-  best-effort로 시도합니다.
+  best-effort로 시도합니다. worker 완료와 cancel 사이의 낙관적 동시성 보호가 없어
+  최종 상태를 다시 확인해야 합니다.
+- 일부 validation/domain 예외가 일관된 4xx ProblemDetails로 매핑되지 않을 수 있습니다.

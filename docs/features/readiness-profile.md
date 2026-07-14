@@ -95,6 +95,8 @@ flowchart TD
 ## Docker socket posture
 
 Local Docker socket mode는 Docker Desktop/Compose 기반 개발을 위한 local-only runner입니다.
+Production-like posture를 수동 검증할 때는 `.env` 또는 shell environment 값을 바꾸고
+API/worker를 recreate해 실제 container 환경에 반영합니다.
 Readiness는 다음처럼 판단합니다.
 
 - `AllowLocalDockerSocket=false`이면 local runner가 명시적으로 허용되지 않았으므로
@@ -140,5 +142,7 @@ curl -X POST http://localhost:8080/api/readiness/profiles/personal-github-linear
 - GitHub PR 생성 자체를 dummy PR로 증명하지는 않습니다.
 - Linear/Notion publisher는 configured target에 실제 report를 남기므로 별도 sandbox target을 쓰는 것이 안전합니다.
 - 실제 provider integration test는 개인 credential이 필요하므로 기본 test suite에서는 fake 중심으로 검증합니다.
+- `/health` 성공은 worker consume loop, agent image, provider 권한까지 증명하지 않습니다.
+- `POST /doctor`는 configured Linear/Notion target에 실제로 쓸 수 있습니다.
 
 <!-- markdownlint-enable -->

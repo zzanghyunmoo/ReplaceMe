@@ -45,6 +45,9 @@ DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike=false
 주의: `POST /doctor`와 failed pre-run gate는 설정된 Linear/Notion target에 실제 report를
 쓸 수 있습니다. QA용 issue/page를 사용하는 것이 안전합니다.
 
+Docker isolation posture는 Compose interpolation을 사용합니다. `.env` 또는 shell
+값을 바꾼 뒤 API를 recreate해 실제 container environment에 반영합니다.
+
 ## Sandbox preflight
 
 L3 provider 테스트 전에 실제 쓰기 대상이 모두 QA용인지 먼저 기록합니다.
@@ -220,16 +223,15 @@ curl -s "$BASE_URL/api/readiness/profiles/personal-github-linear-notion" \
 
 ## READY-009. Production-like Docker socket posture는 opt-in 없이는 차단된다
 
-API readiness endpoint가 새 설정을 읽도록 API를 다음 production-like posture로 재시작합니다.
-
-```env
-DEVAUTOMATION_Agent__ExecutionIsolationProfile=ProductionLike
-DEVAUTOMATION_Agent__DockerSocketMode=LocalDockerSocket
-DEVAUTOMATION_Agent__AllowLocalDockerSocket=true
-DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike=false
-```
+Shell environment로 production-like 값을 주고 실행 중인 API만 재생성합니다.
 
 ```bash
+DEVAUTOMATION_Agent__ExecutionIsolationProfile=ProductionLike \
+DEVAUTOMATION_Agent__DockerSocketMode=LocalDockerSocket \
+DEVAUTOMATION_Agent__AllowLocalDockerSocket=true \
+DEVAUTOMATION_Agent__AllowLocalDockerSocketInProductionLike=false \
+  docker compose up -d --no-deps --force-recreate api
+
 curl -s "$BASE_URL/api/readiness/profiles/personal-github-linear-notion" \
   | jq '.isRunnable, (.checks[] | select(.id == "agent.docker.socket.posture"))'
 ```
@@ -239,6 +241,12 @@ curl -s "$BASE_URL/api/readiness/profiles/personal-github-linear-notion" \
 - `agent.docker.socket.posture`가 `status=Failed`, `severity=Required`입니다.
 - `isRunnable=false`입니다.
 - repair hint가 isolated runner 또는 명시적 production-like 예외 opt-in을 안내합니다.
+
+테스트 뒤 `.env`의 기본 API 설정으로 복구합니다.
+
+```bash
+docker compose up -d --no-deps --force-recreate api
+```
 
 ## READY-010. Secret redaction gap은 warning으로 보인다
 

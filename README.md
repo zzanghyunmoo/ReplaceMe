@@ -2,7 +2,11 @@
 
 .NET 9 기반 개발 자동화 오케스트레이션 서버입니다. 티켓을 API로 입력하면
 Kafka 큐를 통해 Docker 컨테이너에서 코딩 에이전트를 실행하고, 민감 작업은 MCP
-approval tool을 통해 active notifier의 승인 알림을 받은 뒤 계속 진행합니다.
+approval tool을 통해 승인 결정을 받은 뒤 계속 진행합니다.
+
+> **운영 경계:** 현재 HTTP API에는 인증/인가가 없고 API/worker가 host Docker
+> socket을 사용합니다. 이 구성은 trusted single-user local development 전용이며,
+> 외부·공유·production-like 환경에 그대로 노출하면 안 됩니다.
 
 ## 구성
 
@@ -53,8 +57,11 @@ DEVAUTOMATION_Telemetry__Enabled=true \
 Jaeger UI는 `http://localhost:16686`, Prometheus는 `http://localhost:9090`에서
 확인합니다.
 
-API는 `http://localhost:8080`에서 실행됩니다. Compose의 one-shot `migrate`
-서비스가 EF Core migration을 먼저 적용한 뒤 `api`와 `worker`가 시작됩니다.
+API는 `http://localhost:8080`에서 실행됩니다. Compose의 host port는
+`127.0.0.1`에 bind됩니다. 전체 API를 proxy/tunnel로 공개하지 않습니다. Slack
+callback QA만 `/api/slack/interactivity` 단일 경로를 제한한 proxy를 사용합니다.
+Compose의 one-shot `migrate` 서비스가 EF Core migration을 먼저 적용한 뒤 `api`와
+`worker`가 시작됩니다.
 `worker` 서비스가 Kafka를 consume하고 agent job을 실행하며, API service는 HTTP
 endpoint와 health check를 제공합니다. Compose의 `kafka` 서비스는 Redpanda를
 Kafka-compatible broker로 실행하므로 애플리케이션 설정은 기존 `kafka:9092`
@@ -91,6 +98,11 @@ POST /api/slack/interactivity
 GET /health
 ```
 
+Run Passport endpoint는 `run-passport-summary/v1` ticket-scoped summary를
+반환합니다. `runPassportId`는 attempt/rerun ID가 아니며 `runPassportUrl`은 configured
+API base URL과 결합해야 하는 상대 경로입니다. 이 no-auth endpoint를 public
+proxy/tunnel로 노출하지 않습니다.
+
 ## 설정
 
 모든 민감값은 `appsettings.json`이 아니라 환경변수 또는 `.env`로 주입합니다.
@@ -121,11 +133,13 @@ dotnet test DevAutomation.sln
 
 로컬에 .NET 9 runtime이 없으면 Docker SDK 이미지로 테스트할 수 있습니다.
 
+<!-- markdownlint-disable MD013 -->
 ```bash
 docker run --rm -v "$PWD":/src -w /src \
   mcr.microsoft.com/dotnet/sdk:9.0 \
-  dotnet test DevAutomation.sln --no-restore
+  sh -lc 'dotnet restore DevAutomation.sln && dotnet build DevAutomation.sln --no-restore && dotnet test DevAutomation.sln --no-build'
 ```
+<!-- markdownlint-enable MD013 -->
 
 > Note: .NET 9는 STS release라 지원 기간이 짧습니다. 장기 운영 전에 .NET 10 LTS
 > 전환 여부를 다시 확인하세요.
@@ -137,7 +151,10 @@ docker run --rm -v "$PWD":/src -w /src \
 - Gmail notifier는 Gmail API access token을 사용합니다. token 갱신은 외부
   secret 관리/운영 계층에서 처리해야 합니다.
 - Agent runner는 Docker 컨테이너를 티켓별 1개 생성하고 종료 후 강제 삭제합니다.
-- Anthropic, GitHub, GitLab, Slack, Jira, Linear 관련 secret은 로그 저장 전
-  redaction 대상입니다.
-- 운영에서는 agent image의 네트워크/볼륨 권한과 Docker socket 접근을 별도
-  격리 계층으로 제한하세요.
+- Anthropic, GitHub, GitLab, Slack, Jira, Linear 관련 secret은 agent 실행 로그
+  저장 전 redaction 대상입니다. 모든 framework/provider/file log에 대한 전역 보장은
+  아니므로 별도 secret scan이 필요합니다.
+- 현재 broker에는 persistent volume이 없어 `docker compose down` 뒤 queue, DLQ,
+  consumer offset이 유실될 수 있습니다. 일시 정지는 `stop/start`를 사용합니다.
+- 운영에서는 agent image의 네트워크/볼륨/리소스 권한과 Docker socket 접근을 별도
+  격리 계층으로 제한하고 API 인증/인가를 추가해야 합니다.

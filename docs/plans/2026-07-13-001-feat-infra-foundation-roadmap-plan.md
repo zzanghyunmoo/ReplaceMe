@@ -182,8 +182,8 @@ flowchart LR
 | Existing issue | Relationship to this plan | Execution guidance |
 | --- | --- | --- |
 | [ZZA-58](https://linear.app/zzanghyunmoo/issue/ZZA-58/replaceme-net-9-로컬-빌드-경로-정렬) | Historical precondition for U1. | No longer blocking after ZZA-59 merge. |
-| [ZZA-52](https://linear.app/zzanghyunmoo/issue/ZZA-52/notion-작업-문서와-패턴-뱅크-설계) | Consumes Run Passport v0 and later Langfuse evidence. | Design plan is done; API/worker split and retry/DLQ are now available, so automation hooks should next focus on idempotency, persistence, and redaction safety. |
-| [ZZA-55](https://linear.app/zzanghyunmoo/issue/ZZA-55/github-pr-리뷰-패킷-설계) | Consumes ZZA-52 links and Run Passport v0. | Design plan is done; optionally enrich after ZZA-60. |
+| [ZZA-52](https://linear.app/zzanghyunmoo/issue/ZZA-52/notion-작업-문서와-패턴-뱅크-설계) | Consumes Run Passport v1 and later Langfuse evidence. | Design plan is done; API/worker split and retry/DLQ are now available, so automation hooks should next focus on idempotency, persistence, and redaction safety. |
+| [ZZA-55](https://linear.app/zzanghyunmoo/issue/ZZA-55/github-pr-리뷰-패킷-설계) | Consumes ZZA-52 links and Run Passport v1. | Design plan is done; optionally enrich after ZZA-60. |
 | [ZZA-53](https://linear.app/zzanghyunmoo/issue/ZZA-53/linear-이슈-실행-지시서-설계) | Top-level execution workflow. | Start next after the merged infrastructure foundation and ZZA-52/ZZA-55 design contracts. |
 | [ZZA-54](https://linear.app/zzanghyunmoo/issue/ZZA-54/provider-doctor와-로컬-안전문-설계) | Mostly covered by ZZA-51 and U6 hardening. | Close as duplicate or redefine only the provider-doctor leftovers not covered by readiness and agent hardening. |
 

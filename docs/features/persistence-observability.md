@@ -112,6 +112,16 @@ Compose 기본 경로에서는 `migrate` one-shot service가 `Database:RunMigrat
 `Database:ApplyMigrations=false`로 시작합니다. Compose 밖에서 단일 process로 실행할 때는
 `Database:ApplyMigrations=true`이면 해당 process가 migration을 적용할 수 있습니다.
 
+## 데이터 내구성 경계
+
+- PostgreSQL은 `postgres-data` named volume을 사용합니다.
+- 현재 Redpanda는 volume이 없어 `docker compose down` 뒤 queue, DLQ, consumer
+  offset이 유실될 수 있습니다.
+- DB save와 Kafka publish는 transactional outbox로 묶여 있지 않습니다. Publish 실패
+  시 Pending ticket row가 남을 수 있고 자동 reconciler/re-enqueue API는 없습니다.
+- 일시 정지는 `docker compose stop/start`, disposable 초기화만 `down` 또는
+  `down -v`를 사용합니다.
+
 ## 실행 로그 저장
 
 Agent container 로그는 다음 흐름으로 저장됩니다.
@@ -163,6 +173,7 @@ Compose에서는 `DEVAUTOMATION_Telemetry__OtlpEndpoint=http://otel-collector:43
 
 Collector config는 `docker/otel-collector-config.yaml`에 있으며 trace는 Jaeger로,
 metric은 Collector의 Prometheus exporter endpoint(`otel-collector:8889`)로 보냅니다.
+이 profile에는 alert rule, Alertmanager, dashboard, SLO, backend persistence가 없습니다.
 
 ## 코드 위치
 
@@ -207,6 +218,7 @@ ls logs/
 ## 현재 한계
 
 - structured log에 ticket id correlation enrichment를 더 강화할 여지가 있습니다.
-- execution log retention/cleanup 정책은 아직 없습니다.
+- execution log retention/cleanup 정책과 전역 Serilog redaction 보장은 아직 없습니다.
+- agent stream 밖의 provider/framework/file log도 configured secret scan이 필요합니다.
 - 관측성 profile은 로컬 개발용입니다. 공유/운영 환경에서는 collector exporter와
   backend endpoint를 별도 운영 표준에 맞게 바꿔야 합니다.

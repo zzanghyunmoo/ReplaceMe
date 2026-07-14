@@ -122,16 +122,35 @@ tail -n 100 logs/devautomation-*.log
 
 실제 secret 원문이 execution log나 file log에 남지 않는지 확인합니다. pattern 검색만으로는
 provider별 secret을 놓칠 수 있으므로, `.env`에 설정된 실제 값도 원문을 출력하지 않고
-대조합니다.
+대조합니다. `OBS_TICKET_ID`는 execution log가 하나 이상 있는 처리 완료 Ticket이어야
+합니다.
 
 ```bash
-curl -s "$BASE_URL/api/tickets/$OBS_TICKET_ID/logs?page=1&pageSize=500" \
+set -euo pipefail
+curl -fsS "$BASE_URL/api/tickets/$OBS_TICKET_ID/logs?page=1&pageSize=500" \
   > /tmp/replaceme-observe-logs.json
+docker compose logs --no-color api worker migrate \
+  > /tmp/replaceme-compose-logs.txt
+test -s /tmp/replaceme-observe-logs.json
+test -s /tmp/replaceme-compose-logs.txt
+test -d logs
+python3 - <<'PY'
+from pathlib import Path
+import json
+
+payload = json.loads(Path('/tmp/replaceme-observe-logs.json').read_text())
+if not isinstance(payload, list) or not payload:
+    raise SystemExit('execution log JSON must be a non-empty array')
+if not any(p.stat().st_size > 0 for p in Path('logs').glob('devautomation-*.log')):
+    raise SystemExit('at least one non-empty file log is required')
+PY
 
 python3 - <<'PY'
 from pathlib import Path
+import shlex
 
 log_text = Path('/tmp/replaceme-observe-logs.json').read_text(errors='ignore')
+log_text += '\n' + Path('/tmp/replaceme-compose-logs.txt').read_text(errors='ignore')
 log_text += '\n' + '\n'.join(
     p.read_text(errors='ignore') for p in Path('logs').glob('devautomation-*.log')
 )
@@ -146,13 +165,21 @@ secret_keys = [
     'DEVAUTOMATION_Linear__ApiKey',
     'DEVAUTOMATION_Notion__ApiToken',
     'DEVAUTOMATION_Confluence__ApiToken',
+    'DEVAUTOMATION_Langfuse__PublicKey',
+    'DEVAUTOMATION_Langfuse__SecretKey',
+    'DEVAUTOMATION_LiteLLM__ApiKey',
+    'DEVAUTOMATION_LiteLLM__VirtualKey',
+    'DEVAUTOMATION_Telemetry__OtlpHeaders',
 ]
 values = {}
 for line in Path('.env').read_text(errors='ignore').splitlines():
     if not line or line.lstrip().startswith('#') or '=' not in line:
         continue
-    key, value = line.split('=', 1)
-    value = value.strip()
+    key, raw_value = line.split('=', 1)
+    try:
+        value = ' '.join(shlex.split(raw_value, comments=True, posix=True))
+    except ValueError:
+        value = raw_value.strip()
     if key in secret_keys and len(value) >= 8:
         values[key] = value
 leaked = [key for key, value in values.items() if value in log_text]
@@ -166,9 +193,31 @@ PY
 pattern 기반 보조 검사도 실행합니다.
 
 ```bash
-grep -R -E "(ghp_|github_pat_|glpat-|sk-ant-|xox[baprs]-|xapp-)" logs \
-  && echo "SECRET-LIKE PATTERN FOUND" \
-  || echo "no common secret-like pattern in file logs"
+set -euo pipefail
+test -d logs
+test -s /tmp/replaceme-observe-logs.json
+test -s /tmp/replaceme-compose-logs.txt
+python3 - <<'PY'
+from pathlib import Path
+import json
+
+payload = json.loads(Path('/tmp/replaceme-observe-logs.json').read_text())
+if not isinstance(payload, list) or not payload:
+    raise SystemExit('execution log JSON must be a non-empty array')
+if not any(p.stat().st_size > 0 for p in Path('logs').glob('devautomation-*.log')):
+    raise SystemExit('at least one non-empty file log is required')
+PY
+set +e
+grep -R -q -E "(ghp_|github_pat_|glpat-|sk-ant-|xox[baprs]-|xapp-)" \
+  logs /tmp/replaceme-observe-logs.json /tmp/replaceme-compose-logs.txt
+grep_status=$?
+set -e
+case "$grep_status" in
+  0) echo "SECRET-LIKE PATTERN FOUND"; exit 1 ;;
+  1) echo "no common secret-like pattern in execution/file/Compose logs" ;;
+  *) echo "secret pattern scan failed"; exit "$grep_status" ;;
+esac
+rm -f /tmp/replaceme-observe-logs.json /tmp/replaceme-compose-logs.txt
 ```
 
 기대 결과:
@@ -177,6 +226,8 @@ grep -R -E "(ghp_|github_pat_|glpat-|sk-ant-|xox[baprs]-|xapp-)" logs \
 - common token pattern이 보이면 추가 확인 대상입니다.
 - secret이 필요한 경우 `[REDACTED]`로 보여야 합니다.
 - secret catalog coverage는 readiness profile의 `secrets.redaction.coverage` check로 함께 확인합니다.
+- Agent stream redaction이 Serilog/provider/Compose stdout 전체를 보장하지 않으므로 모든
+  local log surface를 검사합니다.
 
 ## OBS-007. OpenTelemetry profile smoke test
 
@@ -227,7 +278,8 @@ http://localhost:9090
 - [ ] execution log API와 DB row 확인
 - [ ] approval 상태 row 확인
 - [ ] `logs/devautomation-*.log` 생성 확인
-- [ ] configured secret value와 common secret pattern이 API/file log에 노출되지 않음
-- [ ] 필요 시 OTLP export smoke test 확인
+- [ ] configured secret value와 common secret pattern이 API/worker/file/Compose log에 노출되지 않음
+- [ ] observability profile에서 trace/metric 조회 확인
+- [ ] alerting/persistence는 미구현임을 결과에 기록
 
 <!-- markdownlint-enable MD013 -->
