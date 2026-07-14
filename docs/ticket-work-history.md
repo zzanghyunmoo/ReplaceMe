@@ -28,6 +28,10 @@
 | [ZZA-62](https://linear.app/zzanghyunmoo/issue/ZZA-62) Done | [Notion ticket](https://app.notion.com/p/39cef22ad4fc81b588901e065574c84ed) | [infra roadmap U3](./plans/2026-07-13-001-feat-infra-foundation-roadmap-plan.md) | [PR #18](https://github.com/zzanghyunmoo/ReplaceMe/pull/18), `340e919` | [persistence](./features/persistence-observability.md), [QA 06](./qa/06-persistence-observability.md) | Compose profile config와 local telemetry smoke 계약 |
 | [ZZA-63](https://linear.app/zzanghyunmoo/issue/ZZA-63) Backlog | Linear 요구사항 | [infra roadmap U5](./plans/2026-07-13-001-feat-infra-foundation-roadmap-plan.md) | N/A — options만 존재 | roadmap만 | LiteLLM compatibility spike 미실행 |
 | [ZZA-64](https://linear.app/zzanghyunmoo/issue/ZZA-64) Done | [Notion ticket](https://app.notion.com/p/39cef22ad4fc81a3ba01449e7515510b) | [infra roadmap U6](./plans/2026-07-13-001-feat-infra-foundation-roadmap-plan.md) | [PR #19](https://github.com/zzanghyunmoo/ReplaceMe/pull/19), `ea38509` | [agent](./features/agent-execution.md), [readiness](./features/readiness-profile.md) | `AgentHardeningTests`, local boundary hardening 완료 |
+| [ZZA-65](https://linear.app/zzanghyunmoo/issue/ZZA-65) In Review | [Notion ticket](https://app.notion.com/p/39def22ad4fc81df9f54dc4f9b5a789f) | N/A — merged infra batch 후속 정리 | [PR #20](https://github.com/zzanghyunmoo/ReplaceMe/pull/20) | infra/QA 문서 최소 동기화 | 전체 test 52개, build/diff check |
+| [ZZA-66](https://linear.app/zzanghyunmoo/issue/ZZA-66) In Review | [Notion ticket](https://app.notion.com/p/39def22ad4fc810f8201f987d326c761) | [Run Passport plan](./plans/2026-07-09-001-feat-run-passport-minimal-contract-plan.md) | [PR #21](https://github.com/zzanghyunmoo/ReplaceMe/pull/21) | [Run Passport v1](./features/run-passport.md) | focused 27개, branch test 74개 |
+| [ZZA-67](https://linear.app/zzanghyunmoo/issue/ZZA-67) In Review | [Notion ticket](https://app.notion.com/p/39def22ad4fc81a0ba03f1392f8e975e) | N/A — operations review hardening | [PR #22](https://github.com/zzanghyunmoo/ReplaceMe/pull/22) | [local ops](./features/local-operations.md), [QA 00](./qa/00-local-runbook.md) | composition 8개, branch test 76개 |
+| [ZZA-68](https://linear.app/zzanghyunmoo/issue/ZZA-68) In Review | [Notion ticket](https://app.notion.com/p/39def22ad4fc8146bad4ef37d06519cf) | N/A — canonical docs sync scope | [PR #23](https://github.com/zzanghyunmoo/ReplaceMe/pull/23) | [architecture](./architecture.md), [guides](./guides/operator-guide.md), [KB](./kb/README.md) | markdownlint/link check, branch test 76개 |
 <!-- markdownlint-enable MD013 -->
 
 ## 단계별 산출물 위치
@@ -38,10 +42,10 @@
 - 운영 검증: `docs/qa/`
 - canonical 티켓 폴더: Notion `개발 문서 → 티켓 → ZZA-*`
 
-ZZA-51과 ZZA-56은 독립 plan과 단계별 Notion child page가 있습니다. ZZA-59,
-61, 62, 64는 공통 인프라 roadmap에서 U-ID로 계획했습니다. ZZA-57/58은 장애·환경
-precondition에서 분리된 티켓이라 독립 로컬 brainstorm 문서 대신 Linear 설명과
-Notion 티켓 문서가 요구사항 근거입니다.
+ZZA-51과 ZZA-56/66은 독립 plan과 단계별 Notion child page가 있습니다. ZZA-59,
+61, 62, 64는 공통 인프라 roadmap에서 U-ID로 계획했습니다. ZZA-57/58과 ZZA-65,
+67, 68은 장애·후속 정리·검증에서 분리된 티켓이라 독립 로컬 brainstorm 문서 대신
+Linear 설명과 Notion 티켓 문서가 요구사항 근거입니다.
 
 ## 완료 판단 규칙
 
