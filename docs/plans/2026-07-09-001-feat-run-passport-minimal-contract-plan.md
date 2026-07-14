@@ -25,172 +25,288 @@ execution: code
 
 ---
 
+## Current Implementation Status
+
+The original ZZA-56 v0 baseline has already shipped:
+
+| Unit | Shipped evidence | Current path |
+| --- | --- | --- |
+| U1 contract | [PR #8](https://github.com/zzanghyunmoo/ReplaceMe/pull/8), `7cb1db4` | `src/DevAutomation.Core/Contracts/RunPassportContracts.cs` |
+| U2 endpoint | [PR #8](https://github.com/zzanghyunmoo/ReplaceMe/pull/8), `7cb1db4` | `src/DevAutomation.Api/Program.cs` |
+| U3 docs | [PR #9](https://github.com/zzanghyunmoo/ReplaceMe/pull/9), `5889436` | `docs/features/run-passport.md` |
+
+Do not recreate the types, route, tests, or feature document named below. This plan records the
+gap-only hardening that promotes the shipped v0 baseline to the explicit v1 contract. ZZA-66
+implements the corrections and verification described below.
+
 ## Product Contract
 
 Product Contract preservation: no prior requirements-only artifact exists for ZZA-56 in this repo. This plan bootstraps the smallest implementation-ready contract from the user's approved sequencing decision.
 
 ### Summary
 
-ReplaceMe needs a stable Run Passport summary shape before ZZA-52 and ZZA-55 can build Notion lifecycle pages and PR review packets in parallel. The first slice must expose a contract that identifies an automation run, points to known Linear/GitHub/Notion surfaces where available, summarizes status/evidence/risk fields, and clearly marks unavailable fields as null rather than letting downstream features invent their own names.
+ReplaceMe needs one stable, machine-facing summary shape before ZZA-52 and ZZA-55 build
+Notion lifecycle pages and PR review packets. The v1 passport is a mutable,
+ticket-scoped workflow summary, not an immutable identity for each Kafka attempt or future
+rerun. It standardizes current status, links, timestamps, and downstream-owned placeholders;
+it does not by itself explain the full implementation outcome to a reviewer.
 
 ### Problem Frame
 
-The ZZA-51 plan deliberately kept Run Passport, PR packet generation, Notion lifecycle documents, and Linear issue execution grammar out of readiness scope. The follow-up split is correct, but ZZA-52 and ZZA-55 both need the same run identity and summary fields. If each ticket invents its own names for run links, status, evidence, and residual risk, ZZA-56 will later have to normalize incompatible contracts.
+The ZZA-51 plan deliberately kept Run Passport, PR packet generation, Notion lifecycle
+documents, and Linear issue execution grammar out of readiness scope. ZZA-52 and ZZA-55 need
+the same ticket-scoped identity and field semantics. If each consumer invents names, absence
+rules, or URL resolution behavior, a later contract revision must normalize incompatible
+integrations.
 
 ### Actors
 
-- A1. **ReplaceMe API caller.** Fetches a ticket and its Run Passport summary.
-- A2. **Notion lifecycle document worker.** Later consumes the summary to render/update ticket-scoped Notion pages.
-- A3. **PR review packet worker.** Later consumes the summary to populate the PR body and residual-risk section.
-- A4. **Linear issue execution worker.** Later attaches or displays the Passport reference when a Linear issue triggers an automation run.
-- A5. **Reviewer/operator.** Reads the summary to understand what happened without scraping logs.
+- A1. **ReplaceMe API caller.** Fetches a ticket-scoped Run Passport summary.
+- A2. **Notion lifecycle document worker.** Consumes passport run/status/link fields and loads
+  repository/base-branch context separately from the Ticket contract.
+- A3. **PR review packet worker.** Consumes passport fields when evidence producers have filled
+  them; v1 alone is not a complete review narrative.
+- A4. **Linear issue execution worker.** Later attaches or displays the ticket-scoped Passport
+  reference when a Linear issue triggers an automation run.
+- A5. **Reviewer/operator.** Uses the summary as a compact index to current state and links,
+  then reviews the PR and explicit evidence surfaces for what changed and what was verified.
 
 ### Requirements
 
 **Contract identity**
 
-- R1. The contract must expose a stable contract version string so future consumers can detect changes.
-- R2. The contract must expose a stable Run Passport identifier derived from the ticket identifier for this first non-persistent slice.
-- R3. The contract must expose a relative API URL for fetching the Run Passport summary.
+- R1. The contract must expose a stable contract version string so future consumers can detect
+  incompatible changes.
+- R2. `runPassportId = ticket:{ticketId}` identifies one mutable ticket workflow. Consumers
+  must not use it as an immutable Kafka-attempt, replay, or rerun identifier.
+- R3. The shipped `runPassportUrl` field contains a relative API path, not an externally
+  navigable URL. Consumers must resolve it against their configured ReplaceMe API base URL and
+  must not embed the unresolved path as a Notion or PR backlink.
 
 **Run surface links**
 
-- R4. The contract must include the source ticket id and title.
-- R5. The contract must include the external issue provider/key/url when the ticket has an issue tracker reference.
-- R6. The contract must include the PR URL when the agent run completed with one.
-- R7. The contract must reserve Notion document id/url fields as nullable until ZZA-52 owns lifecycle document persistence.
+- R4. The contract must include the source ticket id and title. Repository URL and base branch
+  remain explicit dependencies of the separate Ticket contract in v1.
+- R5. External issue links must be absolute HTTPS URLs with no userinfo or credential-bearing
+  query values and must match the selected provider's configured cloud or enterprise host.
+- R6. Pull-request links follow the same validation rule and map empty, whitespace-only, or
+  invalid values to `null`.
+- R7. Notion document id/url fields remain nullable until ZZA-52 owns lifecycle persistence;
+  their v1 absence meaning is `not-produced` and does not block the passport response.
 
 **Status and review support**
 
-- R8. The contract must include ticket status and a short human summary.
-- R9. The contract must include failure reason when present.
-- R10. The contract must reserve test summary and residual risk summary as nullable fields until a later evidence collector or PR packet worker owns them.
-- R11. The contract must include created, started, completed, and updated timestamps where the current ticket model can supply them.
+- R8. The contract must include ticket status and a short machine-facing lifecycle summary.
+  It must not claim to summarize code changes, tests, or residual risk when those producers have
+  not supplied evidence.
+- R9. A failed or cancelled ticket may expose only a public-safe generic failure summary. The
+  contract must never return raw `Ticket.FailReason`.
+- R10. Test and residual-risk summaries remain nullable until an evidence collector or PR
+  packet worker owns them; their v1 absence meaning is `not-captured` and is non-blocking.
+- R11. The contract must expose `CreatedAt`, `StartedAt`, `CompletedAt`, and the derived
+  `LastLifecycleAt = CompletedAt ?? StartedAt ?? CreatedAt`. `LastLifecycleAt` is not a general
+  mutation timestamp or synchronization cursor.
 
 **Boundary**
 
 - R12. This slice must not add a new persisted Run Passport table.
-- R13. This slice must not implement rerun lineage, Notion page creation/update, PR body generation, or Linear issue execution grammar.
-- R14. The contract must not expose secrets, tokens, local filesystem paths, or raw execution log content.
+- R13. This slice must not implement immutable attempt identity, rerun lineage, Notion page
+  creation/update, PR body generation, or Linear issue execution grammar.
+- R14. The contract must not expose secrets, tokens, local filesystem paths, credential-bearing
+  URLs, or raw execution log/failure content.
+- R15. The endpoint inherits ReplaceMe's current trusted single-user local-only boundary. It has
+  no authentication or authorization, binds through the loopback-only local Compose profile,
+  and must not be exposed through a public proxy or tunnel.
+
+### Nullable Field Availability
+
+| Field | Producer | Becomes available | `null` meaning in v1 | Blocks response |
+| --- | --- | --- | --- | --- |
+| `pullRequestUrl` | Agent/repository provider | Valid PR/MR URL returned | Not created, unavailable, empty, or invalid | No |
+| `notionDocumentId`, `notionDocumentUrl` | ZZA-52 lifecycle publisher | Lifecycle page persisted | Not produced | No |
+| `testSummary` | Future evidence collector | Test evidence normalized | Not captured | No |
+| `residualRiskSummary` | ZZA-55/evidence collector | Risk evidence normalized | Not captured | No |
+| `failureReason` | Public-safe failure projector | Failed/cancelled outcome | No public failure detail | No |
+
+These are documented v1 rules, not additional machine-readable absence-reason fields.
 
 ### Acceptance Examples
 
-- AE1. Given a pending ticket with an external Linear issue URL, when the API caller fetches its Run Passport summary, then the response includes `contractVersion`, a deterministic `runPassportId`, the ticket status, the external issue fields, and null PR/Notion/test/risk fields.
-- AE2. Given a completed ticket with a PR URL, when the API caller fetches its Run Passport summary, then the response includes the PR URL and a completion summary.
-- AE3. Given a failed ticket with a failure reason, when the API caller fetches its Run Passport summary, then the response includes the failure reason and a failure summary.
-- AE4. Given an unknown ticket id, when the API caller fetches its Run Passport summary, then the endpoint returns 404.
+- AE1. A pristine pending ticket with a valid Linear URL returns the ticket-scoped id, relative
+  API path, status, validated issue fields, and null downstream-owned fields.
+- AE2. A completed ticket returns a validated PR URL when present; null, empty, whitespace-only,
+  non-HTTPS, userinfo-bearing, credential-bearing, or unapproved-host values return `null`.
+- AE3. A failed ticket whose raw reason contains assignments, headers, JSON credentials, URLs,
+  Unix paths, or Windows paths returns only the generic public-safe failure summary.
+- AE4. An unknown ticket id returns 404.
+- AE5. A retrying ticket may be `Pending` with a non-null `StartedAt`; its summary says the
+  ticket is pending retry rather than claiming execution never started.
+- AE6. Running, WaitingApproval, and Cancelled tickets have explicit status and summary mappings.
+- AE7. The endpoint returns the canonical camelCase JSON shape with explicit nullable fields and
+  does not mutate state or enqueue work.
 
 ### Scope Boundaries
 
 **In scope**
 
-- Domain/contract model for the minimal Run Passport summary.
-- A ticket-derived factory or service that builds the summary without persisting a new table.
-- A read-only API endpoint for `GET /api/tickets/{id}/run-passport`.
-- Unit tests for contract mapping and endpoint-visible behavior where practical.
-- Feature documentation that marks the contract as v0/minimal and non-persistent.
+- Promoting the shipped ticket-derived v0 baseline to the explicit v1 contract without adding persistence.
+- Exact C#/JSON wire shape, nullable-field rules, link normalization, and public-safe failure
+  projection.
+- Automated mapping, serialization, and HTTP 200/404/non-mutation tests.
+- Feature documentation that marks the contract as ticket-scoped, local-only, minimal, and
+  non-persistent.
 
 **Out of scope**
 
-- Full Run Passport persistence shape.
+- Full Run Passport persistence shape or immutable attempt/run identifiers.
 - Rerun lineage and replay semantics.
 - Notion lifecycle page creation or updates.
 - GitHub PR review packet body generation.
 - Linear issue execution grammar or runnable issue validation.
-- Secret scanning beyond not including logs/secrets in this summary model.
+- Authentication/authorization implementation; public exposure remains prohibited.
 
 ---
 
 ## Implementation Units
 
-### U1. Add the Run Passport summary contract
+### U1. Harden the shipped Run Passport summary contract
 
-**Goal:** Add a stable, serializable Core contract that downstream features can consume without knowing Ticket internals.
+**Status:** Baseline shipped in PR #8; ZZA-66 implements the hardening gaps below.
+
+**Goal:** Keep one stable ticket-scoped run/status/link shape while making its wire semantics,
+absence rules, and public-data boundary explicit. Repository/base-branch context remains in the
+separate Ticket contract.
 
 **Files:**
 
-- Create `src/DevAutomation.Core/Contracts/RunPassportContracts.cs`
-- Modify `src/DevAutomation.Core/DevAutomation.Core.csproj` only if needed by namespace/build rules
-- Create or modify `tests/DevAutomation.Tests/RunPassportContractTests.cs`
+- Modify `src/DevAutomation.Core/Contracts/RunPassportContracts.cs`
+- Modify `tests/DevAutomation.Tests/RunPassportContractTests.cs`
+- Move public-safe failure projection out of the static raw-string mapping seam if required by
+  the final implementation shape
+
+**Normative wire shape:**
+
+| JSON field | C# type | Nullable | Semantics |
+| --- | --- | --- | --- |
+| `contractVersion` | `string` | No | Exact value `run-passport-summary/v1` |
+| `runPassportId` | `string` | No | Mutable ticket key `ticket:{ticketId}` |
+| `runPassportUrl` | `string` | No | Relative API path; consumer resolves base URL |
+| `ticketId` | `Guid` | No | JSON UUID string |
+| `title` | `string` | No | Ticket title |
+| `status` | `string` | No | `Pending`, `Running`, `WaitingApproval`, `Completed`, `Failed`, `Cancelled` |
+| `summary` | `string` | No | Machine-facing lifecycle summary only |
+| `createdAt` | `DateTimeOffset` | No | ISO 8601/RFC 3339 JSON timestamp |
+| `startedAt`, `completedAt` | `DateTimeOffset?` | Yes | ISO timestamp or explicit `null` |
+| `lastLifecycleAt` | `DateTimeOffset` | No | `CompletedAt ?? StartedAt ?? CreatedAt`; not a general update clock |
+| `issueTracker` | `string?` | Yes | `Jira`, `Linear`, or `null` |
+| `externalIssueKey` | `string?` | Yes | Provider key or `null` |
+| `externalIssueUrl` | `string?` | Yes | Validated absolute HTTPS URL or `null` |
+| `pullRequestUrl` | `string?` | Yes | Validated absolute HTTPS URL or `null` |
+| `notionDocumentId`, `notionDocumentUrl` | `string?` | Yes | `null` until ZZA-52 publishes |
+| `testSummary`, `residualRiskSummary` | `string?` | Yes | `null` until evidence producer exists |
+| `failureReason` | `string?` | Yes | Generic public-safe detail or `null`; never raw failure text |
+
+ASP.NET JSON serialization uses camelCase property names and includes explicit nulls for the
+nullable fields above. Add a canonical serialized fixture that locks this shape.
 
 **Approach:**
 
-- Add `RunPassportSummaryResponse` as a public sealed record under `DevAutomation.Core.Contracts`.
-- Include these fields in the first contract: `ContractVersion`, `RunPassportId`, `RunPassportUrl`, `TicketId`, `Title`, `Status`, `Summary`, `CreatedAt`, `StartedAt`, `CompletedAt`, `UpdatedAt`, `IssueTracker`, `ExternalIssueKey`, `ExternalIssueUrl`, `PullRequestUrl`, `NotionDocumentId`, `NotionDocumentUrl`, `TestSummary`, `ResidualRiskSummary`, `FailureReason`.
-- Add a static factory such as `From(Ticket ticket)` or a small service method. The first slice can derive `RunPassportId` as `ticket:{ticket.Id}` and `RunPassportUrl` as `/api/tickets/{ticket.Id}/run-passport`.
-- Keep Notion/test/risk fields nullable and explicitly unfilled because their owners are later tickets.
-- Generate `Summary` from the ticket status and known fields without reading execution logs.
+- Preserve `ticket:{ticket.Id}` as the v1 ticket-workflow key and document that retries share it.
+- Preserve `runPassportUrl` across the version bump, but treat it normatively as a relative path;
+  each consumer combines it with a configured ReplaceMe API base URL.
+- Validate issue and PR URLs as absolute HTTPS values without userinfo or credential-bearing
+  query values and against configured provider hosts; invalid values become `null`.
+- Map raw failure text to a generic allowlisted public summary such as `Execution failed.` or
+  `Execution cancelled.` before constructing both `FailureReason` and `Summary`.
+- Keep downstream-owned fields null according to the availability matrix above.
+- Map a `Pending` ticket with non-null `StartedAt` to a pending-retry summary.
+- Generate `Summary` from ticket state and public-safe values without reading execution logs.
 
 **Patterns to follow:**
 
-- `src/DevAutomation.Core/Contracts/TicketContracts.cs` for response record shape and `From(...)` factory style.
-- `tests/DevAutomation.Tests/TicketIssueTrackerTests.cs` for domain-contract style assertions.
+- `src/DevAutomation.Core/Contracts/TicketContracts.cs` for response record shape.
+- `src/DevAutomation.Infrastructure/Agents/SecretRedactor.cs` for configured-value redaction
+  coverage; the public contract must not create an Infrastructure dependency from Core.
 
-**Execution note:** Start with a failing test for `RunPassportSummaryResponse.From(ticket)` before adding the contract.
+**Execution note:** Add failing tests for every gap before changing the shipped contract.
 
 **Test scenarios:**
 
-- Pending ticket maps to `contractVersion = run-passport-summary/v0`, deterministic `runPassportId`, relative URL, title, status, timestamps, and null downstream-only fields.
-- Ticket with external issue reference maps provider/key/url to the summary.
-- Completed ticket maps PR URL and completion summary.
-- Failed ticket maps failure reason and failure summary.
+- Pristine Pending and pending-retry tickets have distinct summaries.
+- Running, WaitingApproval, Completed, Failed, and Cancelled mappings are explicit.
+- Issue/PR links cover valid, null, empty, whitespace, non-HTTPS, userinfo, credential query,
+  unexpected host, and enterprise-host cases.
+- Failure input covers assignment, header, JSON, credential URL, Unix path, and Windows path
+  forms and never appears raw in `FailureReason` or `Summary`.
+- The canonical JSON fixture locks field names, enum strings, timestamp encoding, and explicit
+  null placeholders.
 
 **Verification:**
 
 - `dotnet test DevAutomation.sln --no-restore --filter RunPassportContractTests`
 
-### U2. Expose the read-only Run Passport endpoint
+### U2. Verify and constrain the shipped read-only endpoint
 
-**Goal:** Add the first API surface that downstream tools can call to retrieve the contract.
+**Status:** Route shipped in PR #8; ZZA-66 adds wire-level and boundary coverage.
+
+**Goal:** Prove the existing endpoint returns the normative contract without mutation and stays
+inside ReplaceMe's trusted local-only deployment boundary.
 
 **Files:**
 
-- Modify `src/DevAutomation.Api/Program.cs`
-- Modify or create `tests/DevAutomation.Tests/RunPassportEndpointTests.cs` if endpoint testing can be done without broad test infrastructure churn
+- Modify `src/DevAutomation.Api/Program.cs` only for the minimal test-host seam if needed
+- Modify `tests/DevAutomation.Tests/DevAutomation.Tests.csproj` to reference the API/test host
+- Create `tests/DevAutomation.Tests/RunPassportEndpointTests.cs`
 
 **Approach:**
 
-- Add `GET /api/tickets/{id:guid}/run-passport` near the existing ticket read endpoints.
-- Load the ticket with `AsNoTracking()` and return 404 if missing.
-- Return `RunPassportSummaryResponse.From(ticket)` for existing tickets.
-- Do not include execution logs or approval request payloads in this first endpoint.
-- If full minimal-API integration tests require adding heavy web test infrastructure, prefer unit coverage of the contract plus a small endpoint mapping test only if the existing project already supports it.
-
-**Patterns to follow:**
-
-- Existing `GET /api/tickets/{id:guid}` endpoint in `src/DevAutomation.Api/Program.cs`.
-- Existing response factory style in `src/DevAutomation.Core/Contracts/TicketContracts.cs`.
-
-**Execution note:** Prefer proof-first coverage if a lightweight seam exists. If not, record a deliberate no-test exception for the minimal endpoint wrapper and cover the behavior in U1 mapping tests.
+- Keep `GET /api/tickets/{id:guid}/run-passport` read-only with `AsNoTracking()`.
+- Require an automated HTTP test for 200, 404, exact camelCase JSON, enum strings, explicit null
+  placeholders, and absence of queue/state mutations.
+- Add the smallest `WebApplicationFactory<Program>` seam needed by the existing minimal API;
+  do not replace endpoint verification with factory-only unit tests.
+- State explicitly in API docs that the route has no auth/authz, is for loopback-bound trusted
+  local use only, and must not be published through a proxy or tunnel.
+- Do not return execution logs, raw approval payloads, or raw failure text.
 
 **Test scenarios:**
 
-- Existing ticket returns HTTP 200 with the summary shape.
+- Existing ticket returns HTTP 200 with the exact normative JSON fixture.
 - Missing ticket returns HTTP 404.
-- Endpoint does not enqueue work, publish reports, or mutate ticket state.
+- Request leaves Ticket state, execution logs, and Kafka publish count unchanged.
+- Unavailable nullable fields remain present as explicit JSON nulls.
 
 **Verification:**
 
-- Focused test command for endpoint tests if added.
-- Otherwise `dotnet test DevAutomation.sln --no-restore --filter RunPassportContractTests` plus `dotnet build DevAutomation.sln --no-restore`.
+- `dotnet test DevAutomation.sln --no-restore --filter RunPassportEndpointTests`
+- `dotnet test DevAutomation.sln --no-restore --filter RunPassportContractTests`
+- `dotnet build DevAutomation.sln --no-restore`
 
-### U3. Document the v0 contract and boundaries
+### U3. Synchronize the hardened v1 contract and boundaries
 
-**Goal:** Make the contract discoverable to ZZA-52 and ZZA-55 implementers without promising full Passport persistence.
+**Status:** Baseline docs shipped in PR #9; ZZA-66 synchronizes the v1 corrections.
+
+**Goal:** Make ticket-scoped identity, path resolution, separate Ticket context, nullable-field
+semantics, local-only access, and unimplemented evidence producers discoverable without
+promising full Passport persistence.
 
 **Files:**
 
-- Create `docs/features/run-passport.md`
+- Modify `docs/features/run-passport.md`
 - Modify `docs/features/feature-status.md`
 - Modify `docs/README.md`
 - Modify `README.md` if the API endpoint list needs the new route
 
 **Approach:**
 
-- Document the endpoint, contract version, fields, nullable placeholders, and explicit non-goals.
-- Link the feature status page to the new document.
-- Mention that ZZA-52 and ZZA-55 should consume this v0 summary rather than invent separate field names.
-- Keep docs honest: no persistence table, rerun lineage, Notion lifecycle update, or PR packet generation in this slice.
+- Document the endpoint, exact wire contract, nullable availability matrix, and non-goals.
+- Explain that `runPassportId` is ticket-scoped and `runPassportUrl` is a relative path.
+- Name `Ticket.RepoUrl` and `Ticket.BaseBranch` as separate downstream dependencies rather than
+  claiming the passport removes all Ticket coupling.
+- Document local-only access and validated/sanitized public fields.
+- Link the feature status page to the corrected document.
+- Keep docs honest: no persistence table, immutable attempt identity, rerun lineage, Notion
+  lifecycle update, evidence collection, or PR packet generation in this slice.
 
 **Patterns to follow:**
 
@@ -223,32 +339,47 @@ Parallel execution is not recommended inside this small plan because U1 and U2 b
 
 ## Verification Contract
 
-Run these before returning implementation to LFG:
+Run these before returning the gap-only hardening work:
 
 ```bash
 dotnet test DevAutomation.sln --no-restore --filter RunPassportContractTests
+dotnet test DevAutomation.sln --no-restore --filter RunPassportEndpointTests
+dotnet test DevAutomation.sln --no-restore
 dotnet build DevAutomation.sln --no-restore
 git diff --check
 ```
 
-If `--no-restore` fails because the worktree has not restored packages, run `dotnet restore DevAutomation.sln` once, then rerun the commands above and record the deviation.
+If `--no-restore` fails because the worktree has not restored packages, run
+`dotnet restore DevAutomation.sln` once, then rerun the commands above and record the deviation.
 
 ## Definition of Done
 
-- `RunPassportSummaryResponse` exposes the v0 minimal contract.
-- `GET /api/tickets/{id}/run-passport` returns the summary for existing tickets and 404 for missing tickets.
-- Contract tests cover pending, external issue, completed, and failed ticket mapping.
-- Documentation explains the v0 contract and downstream consumer boundary.
-- No new Run Passport persistence table or rerun lineage behavior is introduced.
-- Focused tests, build, and diff whitespace checks pass or any environmental blocker is recorded.
+- The existing v0 implementation is treated as the shipped baseline and promoted to v1 rather than recreated.
+- `RunPassportSummaryResponse` has exact JSON, identity, path, nullability, validation, and
+  public-safe failure semantics.
+- Contract tests cover pristine pending, pending retry, Running, WaitingApproval, Completed,
+  Failed, Cancelled, malformed links, secret/path-bearing failures, and serialized JSON.
+- Endpoint tests prove 200, 404, exact wire shape, explicit nulls, and non-mutation.
+- Documentation explains ticket-scoped identity, separate Ticket context, path resolution,
+  local-only access, nullable-field availability, and unimplemented evidence producers.
+- No persistence table, immutable attempt identity, rerun lineage, or downstream publication is
+  introduced.
+- Focused tests, full tests, build, and diff whitespace checks pass or any environmental blocker
+  is recorded.
 
-## Implementation-Time Unknowns
+## Resolved Implementation Decisions
 
-- Whether endpoint integration tests can be added without bringing in heavier web test packages. Resolve during U2; do not expand scope solely to build a test harness if contract tests already cover the behavior-bearing mapping.
-- Whether the summary should include `UpdatedAt`. The current Ticket model does not have a general updated timestamp, so use the most recent non-null lifecycle timestamp or leave a clearly documented derived value.
+- No endpoint-test exception remains; HTTP behavior is verified with `WebApplicationFactory`.
+- The ambiguous v0 `UpdatedAt` field is renamed to `LastLifecycleAt` and the breaking wire change
+  is represented by `run-passport-summary/v1`.
 
 ## Risks
 
-- **Contract creep:** adding persistence, lineage, or downstream rendering now would block the parallel follow-up wave. Keep the slice minimal.
-- **False evidence:** test and residual-risk fields are placeholders in v0. Do not synthesize them from logs unless a later evidence collector owns that contract.
-- **Naming drift:** downstream docs must use the exact v0 field names or explicitly version a new contract.
+- **Compatibility:** consumers of v0 must opt into v1 because `updatedAt` was renamed to
+  `lastLifecycleAt`; the contract version makes the incompatibility explicit.
+- **False identity:** consumers may still treat the ticket key as an immutable run key unless the
+  ticket-scoped boundary is repeated in code and docs.
+- **False evidence:** test and residual-risk fields remain placeholders until explicit producers
+  own them.
+- **Naming drift:** downstream docs must use exact v1 field names and the same absence rules or
+  explicitly version a new contract.

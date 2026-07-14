@@ -34,6 +34,9 @@ builder.Host.UseSerilog();
 builder.Services.AddDevAutomationCore(builder.Configuration);
 builder.Services.AddDevAutomationInfrastructure(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSingleton(serviceProvider =>
+    new RunPassportProjectionPolicy(
+        [serviceProvider.GetRequiredService<IOptions<JiraOptions>>().Value.BaseUrl]));
 
 builder.Services.AddDevAutomationOpenTelemetry(
     builder.Configuration,
@@ -181,10 +184,16 @@ app.MapGet("/api/tickets/{id:guid}", async (Guid id, DevAutomationDbContext dbCo
     return ticket is null ? Results.NotFound() : Results.Ok(TicketResponse.From(ticket));
 });
 
-app.MapGet("/api/tickets/{id:guid}/run-passport", async (Guid id, DevAutomationDbContext dbContext, CancellationToken cancellationToken) =>
+app.MapGet("/api/tickets/{id:guid}/run-passport", async (
+    Guid id,
+    DevAutomationDbContext dbContext,
+    RunPassportProjectionPolicy projectionPolicy,
+    CancellationToken cancellationToken) =>
 {
     var ticket = await dbContext.Tickets.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-    return ticket is null ? Results.NotFound() : Results.Ok(RunPassportSummaryResponse.From(ticket));
+    return ticket is null
+        ? Results.NotFound()
+        : Results.Ok(RunPassportSummaryResponse.From(ticket, projectionPolicy));
 });
 
 app.MapPost("/api/tickets/{id:guid}/documents", async (
