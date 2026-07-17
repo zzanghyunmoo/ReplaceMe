@@ -89,7 +89,7 @@ flowchart TD
 | 외부 연동 | GitHub/GitLab, Jira/Linear, Notion/Confluence provider 골격 | Linear execution grammar, lifecycle/PR packet 자동 publication |
 | 운영 | `/health`, readiness, Compose, file log, local OTel | persistent broker, worker health, alerting, production manifest |
 | 보안 | local socket opt-in/production-like guard, selected secret allowlist | production-grade isolated runner, API auth, global log redaction |
-| 검증 | 76 unit/composition/HTTP tests | 실제 Compose/provider/full-agent 자동 E2E |
+| 검증 | 87 unit/composition/HTTP tests, local secret scanner Python tests 6개 | 실제 Compose/provider/full-agent 자동 E2E |
 <!-- markdownlint-enable MD013 -->
 
 ## 처음 읽는 순서
